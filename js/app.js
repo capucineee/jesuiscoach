@@ -579,33 +579,6 @@
     return { start: isoFromDate(start), end: isoFromDate(end) };
   }
 
-  function dailyBuckets(startISO, endISO, sessions) {
-    var start = parseISO(startISO), end = parseISO(endISO);
-    var out = [];
-    var cursor = start;
-    while (isoFromDate(cursor) <= endISO) {
-      var iso = isoFromDate(cursor);
-      var mins = sessions.filter(function (s) { return s.date === iso; }).reduce(function (a, s) { return a + (s.duration || 0); }, 0);
-      out.push({ label: fmtShortDate(cursor), v: mins });
-      cursor = addDays(cursor, 1);
-    }
-    return out;
-  }
-
-  function weeklyBuckets(startISO, endISO, sessions) {
-    var start = parseISO(startISO);
-    var buckets = [];
-    var cursor = startOfWeek(start);
-    while (isoFromDate(cursor) <= endISO) {
-      var bStart = isoFromDate(cursor);
-      var bEnd = isoFromDate(addDays(cursor, 6));
-      var mins = sessions.filter(function (s) { return s.date >= bStart && s.date <= (bEnd > endISO ? endISO : bEnd) && s.date >= startISO; }).reduce(function (a, s) { return a + (s.duration || 0); }, 0);
-      buckets.push({ label: fmtShortDate(cursor), v: mins });
-      cursor = addDays(cursor, 7);
-    }
-    return buckets;
-  }
-
   function renderEvolution() {
     var range = periodRange();
     var sessions = sessionsInRange(range.start, range.end);
@@ -616,8 +589,6 @@
     var days = Math.max(1, Math.round((parseISO(range.end) - parseISO(range.start)) / 86400000) + 1);
     var avgPerWeek = (sessions.length / (days / 7)).toFixed(1);
     var adherence = adherenceRate(meals);
-
-    var buckets = days > 20 ? weeklyBuckets(range.start, range.end, sessions) : dailyBuckets(range.start, range.end, sessions);
 
     var html = '';
 
@@ -639,13 +610,6 @@
       '<div class="stat-tile"><div class="value">' + minutesToLabel(totalMinutes) + '</div><div class="label">temps total</div></div>' +
       '<div class="stat-tile"><div class="value">' + avgPerWeek + '</div><div class="label">séances<br/>/ semaine</div></div>' +
       '</div>';
-
-    html += '<div class="card"><div class="card-title">Volume d’entraînement <span class="sub">' + (days > 20 ? 'par semaine' : 'par jour') + '</span></div>';
-    html += '<figure class="chart-figure">' + lineChartSeries(buckets, 'var(--series-1)', minutesToLabel) + '</figure>';
-    html += tableToggle('evo-line', buckets.map(function (b) {
-      return '<tr><td style="padding:4px 6px;">' + esc(b.label) + '</td><td style="padding:4px 6px;">' + minutesToLabel(b.v) + '</td></tr>';
-    }).join(''), ['Période', 'Minutes']);
-    html += '</div>';
 
     html += '<div class="card"><div class="card-title">Répartition par type</div>';
     if (dist.length === 0) {
