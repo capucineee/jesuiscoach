@@ -8,12 +8,10 @@
   var STORAGE_KEY = 'suiviSport.v1';
 
   var SESSION_TYPES = [
-    { id: 'muscu',  label: 'Musculation', icon: '🏋️', color: '#2a78d6' },
-    { id: 'cardio', label: 'Cardio',      icon: '🔥',       color: '#eb6834' },
-    { id: 'foot',   label: 'Football',    icon: '⚽',             color: '#1baf7a' },
-    { id: 'course', label: 'Course',      icon: '🏃',       color: '#eda100' },
-    { id: 'velo',   label: 'Vélo',   icon: '🚴',       color: '#e87ba4' },
-    { id: 'autre',  label: 'Autre',       icon: '⭐',             color: '#4a3aa7' }
+    { id: 'muscu',   label: 'Musculation', icon: '🏋️', color: '#2a78d6' },
+    { id: 'pilates', label: 'Pilates',     icon: '🧘',  color: '#eb6834' },
+    { id: 'cardio',  label: 'Cardio',      icon: '🔥',  color: '#1baf7a' },
+    { id: 'autre',   label: 'Autres',      icon: '⭐',  color: '#eda100' }
   ];
 
   var MEAL_SLOTS = [
