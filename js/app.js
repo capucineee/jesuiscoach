@@ -8,12 +8,12 @@
   var STORAGE_KEY = 'suiviSport.v1';
 
   var SESSION_TYPES = [
-    { id: 'muscu',  label: 'Musculation', icon: '🏋️', color: '#3987e5' },
-    { id: 'cardio', label: 'Cardio',      icon: '🔥',       color: '#d95926' },
-    { id: 'foot',   label: 'Football',    icon: '⚽',             color: '#199e70' },
-    { id: 'course', label: 'Course',      icon: '🏃',       color: '#c98500' },
-    { id: 'velo',   label: 'Vélo',   icon: '🚴',       color: '#d55181' },
-    { id: 'autre',  label: 'Autre',       icon: '⭐',             color: '#9085e9' }
+    { id: 'muscu',  label: 'Musculation', icon: '🏋️', color: '#2a78d6' },
+    { id: 'cardio', label: 'Cardio',      icon: '🔥',       color: '#eb6834' },
+    { id: 'foot',   label: 'Football',    icon: '⚽',             color: '#1baf7a' },
+    { id: 'course', label: 'Course',      icon: '🏃',       color: '#eda100' },
+    { id: 'velo',   label: 'Vélo',   icon: '🚴',       color: '#e87ba4' },
+    { id: 'autre',  label: 'Autre',       icon: '⭐',             color: '#4a3aa7' }
   ];
 
   var MEAL_SLOTS = [
@@ -451,7 +451,7 @@
       todays.forEach(function (s) {
         var t = typeMeta(s.typeId);
         html += '<div class="session-card" style="margin-bottom:10px;">' +
-          '<div class="session-dot" style="background:' + t.color + '22;">' + t.icon + '</div>' +
+          '<div class="session-dot" style="background:' + t.color + '1a;border-color:' + t.color + '55;">' + t.icon + '</div>' +
           '<div class="session-info"><div class="t">' + esc(t.label) + '</div><div class="d">' + minutesToLabel(s.duration) + ' • intensité ' + s.intensity + '/5' + (s.note ? ' • ' + esc(s.note) : '') + '</div></div>' +
           '<div class="session-actions">' +
           '<button class="btn-check' + (s.done ? ' done' : '') + '" data-action="toggle-session" data-id="' + s.id + '" aria-label="Marquer fait">✓</button>' +
