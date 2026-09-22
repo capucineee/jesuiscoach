@@ -233,6 +233,7 @@
       duration: obj.duration,
       intensity: obj.intensity,
       note: obj.note || '',
+      exercises: obj.exercises || [],
       done: true
     });
     saveState();
@@ -415,6 +416,19 @@
     });
   }
 
+  function renderExerciseSummary(exercises) {
+    var totalSets = exercises.reduce(function (a, ex) { return a + ex.sets.length; }, 0);
+    var html = '<details class="exercise-details"><summary>' + exercises.length + ' exercice' + (exercises.length > 1 ? 's' : '') + ' · ' + totalSets + ' série' + (totalSets > 1 ? 's' : '') + '</summary>';
+    html += '<div class="exercise-summary-list">';
+    exercises.forEach(function (ex) {
+      html += '<div class="exercise-summary-row"><b>' + esc(ex.name) + '</b>' +
+        (ex.sets.length ? ' ' + ex.sets.map(function (s) { return s.weight + 'kg×' + s.reps; }).join(', ') : ' —') +
+        '</div>';
+    });
+    html += '</div></details>';
+    return html;
+  }
+
   /* ==========================================================================
      Vue Jour
      ========================================================================== */
@@ -450,13 +464,18 @@
     } else {
       todays.forEach(function (s) {
         var t = typeMeta(s.typeId);
+        var exercises = s.exercises || [];
+        var totalSets = exercises.reduce(function (a, ex) { return a + ex.sets.length; }, 0);
         html += '<div class="session-card" style="margin-bottom:10px;">' +
+          '<div class="session-row">' +
           '<div class="session-dot" style="background:' + t.color + '1a;border-color:' + t.color + '55;">' + t.icon + '</div>' +
-          '<div class="session-info"><div class="t">' + esc(t.label) + '</div><div class="d">' + minutesToLabel(s.duration) + ' • intensité ' + s.intensity + '/5' + (s.note ? ' • ' + esc(s.note) : '') + '</div></div>' +
+          '<div class="session-info"><div class="t">' + esc(t.label) + '</div><div class="d">' + minutesToLabel(s.duration) + ' • intensité ' + s.intensity + '/5' + (totalSets ? ' • ' + totalSets + ' séries' : '') + (s.note ? ' • ' + esc(s.note) : '') + '</div></div>' +
           '<div class="session-actions">' +
           '<button class="btn-check' + (s.done ? ' done' : '') + '" data-action="toggle-session" data-id="' + s.id + '" aria-label="Marquer fait">✓</button>' +
           '<button class="btn-del" data-action="delete-session" data-id="' + s.id + '" aria-label="Supprimer">✕</button>' +
-          '</div></div>';
+          '</div></div>' +
+          (exercises.length ? renderExerciseSummary(exercises) : '') +
+          '</div>';
       });
     }
     html += '<button class="btn-add-inline" data-action="open-sheet" data-sheet="session" style="margin-top:4px;">+ Ajouter une séance</button>';
@@ -665,13 +684,34 @@
     if (e) e.addEventListener('change', function () { ui.customEnd = e.value; render(); });
   }
 
+  function renderExerciseBlock(ex) {
+    var html = '<div class="exercise-block">';
+    html += '<div class="exercise-head"><span class="exercise-name">' + esc(ex.name) + '</span>' +
+      '<button class="btn-del-mini" data-action="remove-exercise" data-exercise-id="' + ex.id + '" aria-label="Supprimer l’exercice">✕</button></div>';
+    if (ex.sets.length) {
+      html += '<div class="set-list">';
+      ex.sets.forEach(function (s, i) {
+        html += '<div class="set-row"><span>Série ' + (i + 1) + '</span><span>' + s.weight + ' kg × ' + s.reps + '</span>' +
+          '<button class="btn-del-mini" data-action="remove-set" data-exercise-id="' + ex.id + '" data-set-index="' + i + '" aria-label="Supprimer la série">✕</button></div>';
+      });
+      html += '</div>';
+    }
+    html += '<div class="set-add-row">' +
+      '<input type="number" inputmode="decimal" step="0.5" min="0" placeholder="kg" id="w-' + ex.id + '"/>' +
+      '<input type="number" inputmode="numeric" min="1" placeholder="reps" id="r-' + ex.id + '"/>' +
+      '<button class="btn-add-set" data-action="add-set" data-exercise-id="' + ex.id + '">+ série</button>' +
+      '</div>';
+    html += '</div>';
+    return html;
+  }
+
   /* ==========================================================================
      Sheets (formulaires)
      ========================================================================== */
 
   function openSheet(name) {
     ui.sheet = name;
-    ui.draft = name === 'session' ? { date: todayISO(), typeId: 'muscu', duration: 45, intensity: 3, note: '' }
+    ui.draft = name === 'session' ? { date: todayISO(), typeId: 'muscu', duration: 45, intensity: 3, note: '', exercises: [] }
       : name === 'weight' ? { date: todayISO(), kg: '' }
       : name === 'settings' ? { name: state.profile.name, weeklyGoal: state.profile.weeklyGoal }
       : {};
@@ -702,6 +742,12 @@
       html += '<div class="field"><label>Intensité ressentie</label><div class="dots-row">';
       for (var i = 1; i <= 5; i++) html += '<button class="dot-btn' + (d.intensity === i ? ' active' : '') + '" data-action="draft-intensity" data-val="' + i + '">' + i + '</button>';
       html += '</div></div>';
+      html += '<div class="field"><label>Exercices (optionnel)</label>';
+      html += '<div class="exercise-list">' + (d.exercises || []).map(renderExerciseBlock).join('') + '</div>';
+      html += '<div class="exercise-add-row">' +
+        '<input type="text" id="newExerciseName" placeholder="Nom de l’exercice (ex: Développé couché)"/>' +
+        '<button class="btn-add-exercise" data-action="add-exercise" aria-label="Ajouter l’exercice">+</button>' +
+        '</div></div>';
       html += '<div class="field"><label>Date</label><input type="date" id="sessionDate" value="' + d.date + '"/></div>';
       html += '<div class="field"><label>Note (optionnel)</label><textarea id="sessionNote" placeholder="Ex: leg day, 5km en 24min...">' + esc(d.note) + '</textarea></div>';
       html += '<button class="btn-primary" data-action="save-session">Enregistrer la séance</button>';
@@ -812,6 +858,41 @@
     if (action === 'draft-goal') {
       var gd = parseInt(el.getAttribute('data-delta'), 10);
       ui.draft.weeklyGoal = Math.max(1, (ui.draft.weeklyGoal || 1) + gd);
+      renderSheet();
+      return;
+    }
+    if (action === 'add-exercise') {
+      var nameInput = document.getElementById('newExerciseName');
+      var name = (nameInput.value || '').trim();
+      if (!name) { toast('Indique un nom d’exercice'); return; }
+      if (!ui.draft.exercises) ui.draft.exercises = [];
+      ui.draft.exercises.push({ id: uid(), name: name, sets: [] });
+      renderSheet();
+      return;
+    }
+    if (action === 'remove-exercise') {
+      var exId = el.getAttribute('data-exercise-id');
+      ui.draft.exercises = (ui.draft.exercises || []).filter(function (ex) { return ex.id !== exId; });
+      renderSheet();
+      return;
+    }
+    if (action === 'add-set') {
+      var targetId = el.getAttribute('data-exercise-id');
+      var wInput = document.getElementById('w-' + targetId);
+      var rInput = document.getElementById('r-' + targetId);
+      var weight = wInput.value === '' ? 0 : parseFloat(wInput.value);
+      var reps = parseInt(rInput.value, 10);
+      if (!reps || reps <= 0) { toast('Indique le nombre de répétitions'); return; }
+      var ex = (ui.draft.exercises || []).filter(function (x) { return x.id === targetId; })[0];
+      if (ex) ex.sets.push({ weight: weight, reps: reps });
+      renderSheet();
+      return;
+    }
+    if (action === 'remove-set') {
+      var exId2 = el.getAttribute('data-exercise-id');
+      var setIdx = parseInt(el.getAttribute('data-set-index'), 10);
+      var ex2 = (ui.draft.exercises || []).filter(function (x) { return x.id === exId2; })[0];
+      if (ex2) ex2.sets.splice(setIdx, 1);
       renderSheet();
       return;
     }
