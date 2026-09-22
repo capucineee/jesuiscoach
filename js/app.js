@@ -290,6 +290,45 @@
     return Math.round((ok / meals.length) * 100);
   }
 
+  function exerciseProgression() {
+    var map = {};
+    var sorted = state.sessions.slice().sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+    sorted.forEach(function (s) {
+      (s.exercises || []).forEach(function (ex) {
+        if (!ex.sets || !ex.sets.length) return;
+        var key = ex.name.trim().toLowerCase();
+        var maxWeight = ex.sets.reduce(function (m, st) { return Math.max(m, st.weight || 0); }, 0);
+        if (!map[key]) map[key] = { name: ex.name.trim(), occurrences: [] };
+        map[key].name = ex.name.trim();
+        map[key].occurrences.push({ date: s.date, weight: maxWeight });
+      });
+    });
+    return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) {
+      var la = a.occurrences[a.occurrences.length - 1].date;
+      var lb = b.occurrences[b.occurrences.length - 1].date;
+      return la < lb ? 1 : (la > lb ? -1 : 0);
+    });
+  }
+
+  function progressionRowHTML(e) {
+    var n = e.occurrences.length;
+    var last = e.occurrences[n - 1];
+    var prev = n >= 2 ? e.occurrences[n - 2] : null;
+    var trendHTML;
+    if (!prev) {
+      trendHTML = '<span class="progress-trend new">Nouveau</span>';
+    } else {
+      var delta = Math.round((last.weight - prev.weight) * 10) / 10;
+      if (delta > 0) trendHTML = '<span class="progress-trend up">▲ +' + delta + ' kg</span>';
+      else if (delta < 0) trendHTML = '<span class="progress-trend down">▼ ' + delta + ' kg</span>';
+      else trendHTML = '<span class="progress-trend stable">— stable</span>';
+    }
+    return '<div class="progress-row">' +
+      '<div class="progress-info"><div class="pr-name">' + esc(e.name) + '</div><div class="pr-sub">' + last.weight + ' kg · ' + esc(fmtShortDate(parseISO(last.date))) + '</div></div>' +
+      trendHTML +
+      '</div>';
+  }
+
   /* ==========================================================================
      Petits composants SVG (mark specs: barres <=24px, coins 4px, gap 2px)
      ========================================================================== */
@@ -620,6 +659,20 @@
       html += tableToggle('evo-dist', dist.map(function (e) {
         return '<tr><td style="padding:4px 6px;">' + esc(e.type.label) + '</td><td style="padding:4px 6px;">' + e.count + '</td><td style="padding:4px 6px;">' + minutesToLabel(e.minutes) + '</td></tr>';
       }).join(''), ['Type', 'Séances', 'Minutes']);
+    }
+    html += '</div>';
+
+    html += '<div class="card"><div class="card-title">Progression des charges <span class="sub">vs séance précédente</span></div>';
+    var progression = exerciseProgression();
+    if (progression.length === 0) {
+      html += '<div class="empty-state">Ajoute des séries à tes séances pour suivre ta progression.</div>';
+    } else {
+      var shownProgression = progression.slice(0, 6);
+      var restProgression = progression.slice(6);
+      html += '<div class="progress-list">' + shownProgression.map(progressionRowHTML).join('') + '</div>';
+      if (restProgression.length) {
+        html += '<details class="table-toggle"><summary style="cursor:pointer;color:var(--text-muted);font-size:12px;margin-top:10px;">+' + restProgression.length + ' autre' + (restProgression.length > 1 ? 's' : '') + '</summary><div class="progress-list" style="margin-top:10px;">' + restProgression.map(progressionRowHTML).join('') + '</div></details>';
+      }
     }
     html += '</div>';
 
