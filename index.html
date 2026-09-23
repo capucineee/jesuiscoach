@@ -12,11 +12,37 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@600;700;800;900&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/app.css?v=3" />
+<link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 
-<div class="app-shell" id="appShell">
+<div class="auth-screen" id="authScreen" hidden>
+  <div class="auth-card">
+    <div class="auth-logo">JeSuis<span>Coach</span></div>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-action="auth-tab" data-auth-tab="login">Connexion</button>
+      <button type="button" class="auth-tab" data-action="auth-tab" data-auth-tab="register">Créer un compte</button>
+    </div>
+    <div class="auth-error" id="authError" hidden></div>
+    <form id="authForm" autocomplete="on">
+      <div class="field" id="authNameField" hidden>
+        <label>Prénom</label>
+        <input type="text" id="authName" autocomplete="name" placeholder="Ex: Capucine" />
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="authEmail" autocomplete="email" required />
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" id="authPassword" autocomplete="current-password" required minlength="6" />
+      </div>
+      <button type="submit" class="btn-primary" id="authSubmit">Se connecter</button>
+    </form>
+  </div>
+</div>
+
+<div class="app-shell" id="appShell" hidden>
 
   <header class="app-header">
     <div>
@@ -59,6 +85,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/app.js?v=3"></script>
+<script src="js/app.js?v=4"></script>
 </body>
 </html>

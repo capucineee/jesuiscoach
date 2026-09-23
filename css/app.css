@@ -91,6 +91,65 @@ a { color: inherit; }
   position: relative;
 }
 
+/* ---------- Auth ---------- */
+.auth-screen {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(24px + var(--safe-top)) 20px calc(24px + var(--safe-bottom));
+}
+.auth-screen[hidden] { display: none; }
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-card);
+  padding: 28px 24px;
+}
+.auth-logo {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 900;
+  text-align: center;
+  margin-bottom: 22px;
+}
+.auth-logo span { color: var(--accent); }
+.auth-tabs {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 20px;
+}
+.auth-tab {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 9px 6px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.auth-tab.active {
+  background: var(--surface-1);
+  color: var(--accent);
+  box-shadow: var(--shadow-card);
+}
+.auth-error {
+  background: #FFF1EF;
+  color: var(--status-critical);
+  border-radius: var(--radius-s);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
 /* ---------- Header ---------- */
 .app-header {
   position: sticky;

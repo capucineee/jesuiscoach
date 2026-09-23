@@ -5,8 +5,6 @@
      Constantes & données de référence
      ========================================================================== */
 
-  var STORAGE_KEY = 'suiviSport.v1';
-
   var SESSION_TYPES = [
     { id: 'muscu',   label: 'Musculation', icon: '🏋️', color: '#2a78d6' },
     { id: 'pilates', label: 'Pilates',     icon: '🧘',  color: '#eb6834' },
@@ -158,13 +156,18 @@
     };
   }
 
-  var state = loadState();
-  var ui = { tab: 'jour', weekOffset: 0, period: '7', customStart: '', customEnd: '', sheet: null, draft: {} };
+  var TOKEN_KEY = 'jsc.token';
+  var EMAIL_KEY = 'jsc.email';
+  var CACHE_KEY = 'jsc.cache';
 
-  function loadState() {
+  var state = defaultState();
+  var auth = { token: null, email: '' };
+  var ui = { tab: 'jour', weekOffset: 0, period: '7', customStart: '', customEnd: '', sheet: null, draft: {}, authTab: 'login', authBusy: false };
+
+  function loadCachedState() {
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return defaultState();
+      var raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
       var parsed = JSON.parse(raw);
       var d = defaultState();
       return {
@@ -173,14 +176,35 @@
         meals: parsed.meals || [],
         weights: parsed.weights || []
       };
-    } catch (e) { return defaultState(); }
+    } catch (e) { return null; }
   }
 
-  function saveState() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  function cacheStateLocally() {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (e) {}
   }
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  /* ==========================================================================
+     API
+     ========================================================================== */
+
+  function apiFetch(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json' };
+    if (auth.token) headers.Authorization = 'Bearer ' + auth.token;
+    return fetch(path, { method: opts.method || 'GET', headers: headers, body: opts.body }).then(function (res) {
+      if (res.status === 204) return null;
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) {
+          var err = new Error((data && data.error) || 'Erreur serveur, réessaie.');
+          err.status = res.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
 
   /* ==========================================================================
      Data helpers
@@ -214,50 +238,59 @@
   function setMealStatus(dateISO, slotId, status) {
     var existing = mealStatus(dateISO, slotId);
     if (existing && existing.status === status) {
-      state.meals = state.meals.filter(function (m) { return m.id !== existing.id; });
-    } else if (existing) {
-      existing.status = status;
-    } else {
-      state.meals.push({ id: uid(), date: dateISO, slot: slotId, status: status });
+      return apiFetch('/api/meals/' + existing.id, { method: 'DELETE' }).then(function () {
+        state.meals = state.meals.filter(function (m) { return m.id !== existing.id; });
+        cacheStateLocally();
+      });
     }
-    saveState();
+    return apiFetch('/api/meals', { method: 'PUT', body: JSON.stringify({ date: dateISO, slot: slotId, status: status }) }).then(function (row) {
+      if (existing) existing.status = row.status;
+      else state.meals.push(row);
+      cacheStateLocally();
+    });
   }
 
   function addSession(obj) {
-    state.sessions.push({
-      id: uid(),
-      date: obj.date,
-      typeId: obj.typeId,
-      duration: obj.duration,
-      intensity: obj.intensity,
-      note: obj.note || '',
-      exercises: obj.exercises || [],
-      done: true
+    return apiFetch('/api/sessions', { method: 'POST', body: JSON.stringify({
+      date: obj.date, typeId: obj.typeId, duration: obj.duration, intensity: obj.intensity,
+      note: obj.note || '', exercises: obj.exercises || []
+    }) }).then(function (row) {
+      state.sessions.push(row);
+      cacheStateLocally();
     });
-    saveState();
   }
 
   function toggleSessionDone(id) {
-    state.sessions.forEach(function (s) { if (s.id === id) s.done = !s.done; });
-    saveState();
+    var s = state.sessions.filter(function (x) { return x.id === id; })[0];
+    if (!s) return Promise.resolve();
+    return apiFetch('/api/sessions/' + id, { method: 'PATCH', body: JSON.stringify({ done: !s.done }) }).then(function (row) {
+      s.done = row.done;
+      cacheStateLocally();
+    });
   }
 
   function deleteSession(id) {
-    state.sessions = state.sessions.filter(function (s) { return s.id !== id; });
-    saveState();
+    return apiFetch('/api/sessions/' + id, { method: 'DELETE' }).then(function () {
+      state.sessions = state.sessions.filter(function (s) { return s.id !== id; });
+      cacheStateLocally();
+    });
   }
 
   function addWeight(dateISO, kg) {
-    var existing = state.weights.filter(function (w) { return w.date === dateISO; })[0];
-    if (existing) existing.kg = kg;
-    else state.weights.push({ id: uid(), date: dateISO, kg: kg });
-    state.weights.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-    saveState();
+    return apiFetch('/api/weights', { method: 'PUT', body: JSON.stringify({ date: dateISO, kg: kg }) }).then(function (row) {
+      var existing = state.weights.filter(function (w) { return w.date === dateISO; })[0];
+      if (existing) existing.kg = row.kg;
+      else state.weights.push(row);
+      state.weights.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+      cacheStateLocally();
+    });
   }
 
   function deleteWeight(id) {
-    state.weights = state.weights.filter(function (w) { return w.id !== id; });
-    saveState();
+    return apiFetch('/api/weights/' + id, { method: 'DELETE' }).then(function () {
+      state.weights = state.weights.filter(function (w) { return w.id !== id; });
+      cacheStateLocally();
+    });
   }
 
   function currentStreak() {
@@ -795,6 +828,8 @@
         '<button data-action="draft-goal" data-delta="1">+</button>' +
         '</div></div>';
       html3 += '<button class="btn-primary" data-action="save-settings">Enregistrer</button>';
+      html3 += '<div class="settings-row" style="margin-top:14px;"><div class="l">Connecté avec<span class="s">' + esc(auth.email) + '</span></div>' +
+        '<button class="btn-add-inline" data-action="logout" style="width:auto;padding:8px 16px;">Déconnexion</button></div>';
       c.innerHTML = html3;
       document.getElementById('profileName').addEventListener('input', function (e) { ui.draft.name = e.target.value; });
     } else {
@@ -817,6 +852,105 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
+
+  /* ==========================================================================
+     Authentification
+     ========================================================================== */
+
+  function showAuthScreen() {
+    document.getElementById('authScreen').hidden = false;
+    document.getElementById('appShell').hidden = true;
+    renderAuthForm();
+  }
+
+  function showApp() {
+    document.getElementById('authScreen').hidden = true;
+    document.getElementById('appShell').hidden = false;
+  }
+
+  function renderAuthForm() {
+    var isRegister = ui.authTab === 'register';
+    document.querySelectorAll('.auth-tab').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-auth-tab') === ui.authTab);
+    });
+    document.getElementById('authNameField').hidden = !isRegister;
+    document.getElementById('authPassword').setAttribute('autocomplete', isRegister ? 'new-password' : 'current-password');
+    document.getElementById('authSubmit').textContent = isRegister ? 'Créer mon compte' : 'Se connecter';
+    document.getElementById('authError').hidden = true;
+  }
+
+  function setAuthError(msg) {
+    var el = document.getElementById('authError');
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function bootAfterAuth() {
+    var cached = loadCachedState();
+    if (cached) state = cached;
+    showApp();
+    render();
+    apiFetch('/api/state').then(function (data) {
+      state = data;
+      cacheStateLocally();
+      render();
+    }).catch(function (err) {
+      if (err.status === 401) { logout(); return; }
+      if (!cached) toast('Impossible de charger tes données (hors-ligne ?)');
+      else toast('Hors-ligne — dernières données enregistrées');
+    });
+  }
+
+  function logout() {
+    closeSheet();
+    auth.token = null;
+    auth.email = '';
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    try { localStorage.removeItem(EMAIL_KEY); } catch (e) {}
+    try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+    state = defaultState();
+    showAuthScreen();
+  }
+
+  function boot() {
+    var token = null, email = '';
+    try { token = localStorage.getItem(TOKEN_KEY); email = localStorage.getItem(EMAIL_KEY) || ''; } catch (e) {}
+    if (!token) { showAuthScreen(); return; }
+    auth.token = token;
+    auth.email = email;
+    bootAfterAuth();
+  }
+
+  document.getElementById('authForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (ui.authBusy) return;
+    var isRegister = ui.authTab === 'register';
+    var email = document.getElementById('authEmail').value.trim();
+    var password = document.getElementById('authPassword').value;
+    var name = document.getElementById('authName').value.trim();
+    var path = isRegister ? '/api/auth/register' : '/api/auth/login';
+    var body = isRegister ? { email: email, password: password, name: name } : { email: email, password: password };
+
+    ui.authBusy = true;
+    var btn = document.getElementById('authSubmit');
+    btn.disabled = true;
+    apiFetch(path, { method: 'POST', body: JSON.stringify(body) }).then(function (data) {
+      auth.token = data.token;
+      auth.email = data.user.email;
+      try { localStorage.setItem(TOKEN_KEY, data.token); localStorage.setItem(EMAIL_KEY, data.user.email); } catch (err) {}
+      bootAfterAuth();
+    }).catch(function (err) {
+      setAuthError(err.message || 'Une erreur est survenue.');
+    }).then(function () {
+      ui.authBusy = false;
+      btn.disabled = false;
+    });
+  });
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-action="auth-tab"]');
+    if (el) { ui.authTab = el.getAttribute('data-auth-tab'); renderAuthForm(); }
+  });
 
   /* ==========================================================================
      Rendu principal + routage
@@ -846,13 +980,20 @@
       if (tabName) { ui.tab = tabName; render(); }
       return;
     }
-    if (action === 'toggle-session') { toggleSessionDone(el.getAttribute('data-id')); render(); return; }
-    if (action === 'delete-session') { deleteSession(el.getAttribute('data-id')); render(); return; }
-    if (action === 'meal-status') {
-      setMealStatus(el.getAttribute('data-date'), el.getAttribute('data-slot'), el.getAttribute('data-status'));
-      render();
+    if (action === 'toggle-session') {
+      toggleSessionDone(el.getAttribute('data-id')).then(render).catch(function (err) { toast(err.message); });
       return;
     }
+    if (action === 'delete-session') {
+      deleteSession(el.getAttribute('data-id')).then(render).catch(function (err) { toast(err.message); });
+      return;
+    }
+    if (action === 'meal-status') {
+      setMealStatus(el.getAttribute('data-date'), el.getAttribute('data-slot'), el.getAttribute('data-status'))
+        .then(render).catch(function (err) { toast(err.message); });
+      return;
+    }
+    if (action === 'logout') { logout(); return; }
     if (action === 'week-nav') {
       var dir = parseInt(el.getAttribute('data-dir'), 10);
       ui.weekOffset = Math.min(0, ui.weekOffset + dir);
@@ -913,29 +1054,37 @@
     }
     if (action === 'save-session') {
       if (!ui.draft.date) ui.draft.date = todayISO();
-      addSession(ui.draft);
-      closeSheet();
-      render();
-      toast('Séance enregistrée 💪');
+      addSession(ui.draft).then(function () {
+        closeSheet();
+        render();
+        toast('Séance enregistrée 💪');
+      }).catch(function (err) { toast(err.message); });
       return;
     }
     if (action === 'save-weight') {
       var kg = parseFloat(ui.draft.kg);
       if (!kg || kg <= 0) { toast('Indique un poids valide'); return; }
-      addWeight(ui.draft.date || todayISO(), kg);
-      closeSheet();
-      render();
-      toast('Poids enregistré');
+      addWeight(ui.draft.date || todayISO(), kg).then(function () {
+        closeSheet();
+        render();
+        toast('Poids enregistré');
+      }).catch(function (err) { toast(err.message); });
       return;
     }
-    if (action === 'delete-weight') { deleteWeight(el.getAttribute('data-id')); renderSheet(); render(); return; }
+    if (action === 'delete-weight') {
+      deleteWeight(el.getAttribute('data-id')).then(function () { renderSheet(); render(); }).catch(function (err) { toast(err.message); });
+      return;
+    }
     if (action === 'save-settings') {
-      state.profile.name = (ui.draft.name || '').trim();
-      state.profile.weeklyGoal = ui.draft.weeklyGoal || 4;
-      saveState();
-      closeSheet();
-      render();
-      toast('Préférences enregistrées');
+      var newName = (ui.draft.name || '').trim();
+      var newGoal = ui.draft.weeklyGoal || 4;
+      apiFetch('/api/me', { method: 'PUT', body: JSON.stringify({ name: newName, weeklyGoal: newGoal }) }).then(function (profile) {
+        state.profile = profile;
+        cacheStateLocally();
+        closeSheet();
+        render();
+        toast('Préférences enregistrées');
+      }).catch(function (err) { toast(err.message); });
       return;
     }
   });
@@ -950,5 +1099,5 @@
      Init
      ========================================================================== */
 
-  render();
+  boot();
 })();
