@@ -895,7 +895,7 @@
       cacheStateLocally();
       render();
     }).catch(function (err) {
-      if (err.status === 401) { logout(); return; }
+      if (err.status === 401) { logout(); toast('Session expirée, reconnecte-toi — tes données sont toujours là.'); return; }
       if (!cached) toast('Impossible de charger tes données (hors-ligne ?)');
       else toast('Hors-ligne — dernières données enregistrées');
     });

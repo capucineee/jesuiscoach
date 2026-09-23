@@ -11,7 +11,17 @@ const pool = new Pool({
   ssl: useSSL ? { rejectUnauthorized: false } : false
 });
 
+function logConnectionInfo() {
+  try {
+    var u = new URL(process.env.DATABASE_URL);
+    console.log('[db] Connexion à ' + u.hostname + ':' + (u.port || '5432') + u.pathname + ' (utilisateur: ' + u.username + ')');
+  } catch (e) {
+    console.log('[db] Impossible de parser DATABASE_URL pour le log de diagnostic.');
+  }
+}
+
 async function initSchema() {
+  logConnectionInfo();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
@@ -55,6 +65,11 @@ async function initSchema() {
     );
     CREATE INDEX IF NOT EXISTS weights_user_date_idx ON weights(user_id, date);
   `);
+
+  var counts = await pool.query(
+    'SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM sessions) AS sessions'
+  );
+  console.log('[db] Schéma prêt — ' + counts.rows[0].users + ' compte(s), ' + counts.rows[0].sessions + ' séance(s) existantes.');
 }
 
 module.exports = { pool, initSchema };
