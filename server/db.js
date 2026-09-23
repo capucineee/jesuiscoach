@@ -4,11 +4,19 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL manquant — ajoute un plugin PostgreSQL sur Railway (ou lance un Postgres local et exporte la variable).');
 }
 
-const useSSL = /railway\.app|render\.com|amazonaws\.com/.test(process.env.DATABASE_URL) || process.env.PGSSL === 'true';
+function shouldUseSSL(connectionString) {
+  if (process.env.PGSSL === 'true') return true;
+  if (process.env.PGSSL === 'false') return false;
+  var host = '';
+  try { host = new URL(connectionString).hostname; } catch (e) {}
+  var isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  var isRailwayInternal = /\.railway\.internal$/.test(host);
+  return !isLocal && !isRailwayInternal;
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: useSSL ? { rejectUnauthorized: false } : false
+  ssl: shouldUseSSL(process.env.DATABASE_URL) ? { rejectUnauthorized: false } : false
 });
 
 function logConnectionInfo() {
