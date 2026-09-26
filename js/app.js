@@ -515,6 +515,15 @@
       '</div>';
   }
 
+  function goalBannerHTML(doneCount, weeklyGoal, isCurrentWeek) {
+    if (!isCurrentWeek || doneCount < weeklyGoal) return '';
+    var name = state.profile.name ? ', ' + esc(state.profile.name) : '';
+    return '<div class="goal-banner">' +
+      '<div class="gb-title">🎉 Objectif de la semaine atteint !</div>' +
+      '<div class="gb-sub">' + doneCount + ' séance' + (doneCount > 1 ? 's' : '') + ' cette semaine' + name + ' — bravo. Ça repart à zéro lundi.</div>' +
+      '</div>';
+  }
+
   /* ==========================================================================
      Vue Jour
      ========================================================================== */
@@ -542,6 +551,8 @@
       '<div class="stat-tile"><div class="value">' + streak + ' 🔥</div><div class="label">jours de suite</div></div>' +
       '<div class="stat-tile"><div class="value good">' + (adherenceRate(mealsInRange(iso, iso)) === null ? '–' : adherenceRate(mealsInRange(iso, iso)) + '%') + '</div><div class="label">diète du jour</div></div>' +
       '</div>';
+
+    html += goalBannerHTML(doneThisWeek, state.profile.weeklyGoal, true);
 
     html += '<div class="card">';
     html += '<div class="card-title">Séance du jour</div>';
@@ -644,6 +655,8 @@
       '<div class="stat-tile"><div class="value">' + minutesToLabel(totalMinutes) + '</div><div class="label">temps total</div></div>' +
       '<div class="stat-tile"><div class="value good">' + (adherence === null ? '–' : adherence + '%') + '</div><div class="label">diète<br/>respectée</div></div>' +
       '</div>';
+
+    html += goalBannerHTML(doneCount, state.profile.weeklyGoal, ui.weekOffset === 0);
 
     html += '<div class="card"><div class="card-title">Minutes d’entraînement <span class="sub">par jour</span></div>';
     html += '<figure class="chart-figure">' + barChartWeek(dayLabels, dayValues) + '</figure>';

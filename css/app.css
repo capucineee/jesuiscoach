@@ -289,6 +289,26 @@ main.view {
   border-radius: 2px;
 }
 
+/* ---------- Bannière objectif atteint ---------- */
+.goal-banner {
+  background: var(--status-good);
+  border-radius: var(--radius-l);
+  padding: 16px 18px;
+  box-shadow: 0 12px 26px -10px rgba(12,163,12,0.4);
+}
+.goal-banner .gb-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+}
+.goal-banner .gb-sub {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.9);
+  line-height: 1.4;
+}
+
 /* ---------- Stat tiles ---------- */
 .stat-row {
   display: grid;
