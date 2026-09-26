@@ -515,14 +515,28 @@
       '</div>';
   }
 
-  function goalBannerHTML(doneCount, weeklyGoal, isCurrentWeek) {
+  var GOAL_MESSAGES = [
+    function (n, s, name) { return { title: '🔥 Objectif explosé !', body: n + ' séance' + s + ' cette semaine' + name + '. T’es sur une autre planète.' }; },
+    function (n, s, name) { return { title: '🏆 Mission accomplie !', body: n + ' séance' + s + ' bouclée' + s + name + '. Cette semaine restera dans les annales.' }; },
+    function (n, s, name) { return { title: '💥 Et voilà, c’est fait !', body: n + ' séance' + s + name + '. Le repos est mérité, la machine tourne.' }; },
+    function (n, s, name) { return { title: '🎯 Dans le mille !', body: 'Objectif rempli avec ' + n + ' séance' + s + name + '. Une habitude qui s’installe.' }; },
+    function (n, s, name) { return { title: '👑 Semaine de champion !', body: n + ' séance' + s + name + '. Reste plus qu’à la battre la semaine prochaine.' }; },
+    function (n, s, name) { return { title: '⚡ Objectif smashé !', body: n + ' séance' + s + ' cette semaine' + name + '. Ambition validée.' }; },
+    function (n, s, name) { return { title: '🚀 Tu l’as fait !', body: n + ' séance' + s + name + '. La régularité, c’est ça le vrai talent.' }; },
+    function (n, s, name) { return { title: '🌟 Objectif atteint, haut la main !', body: n + ' séance' + s + ' cette semaine' + name + '. Ce niveau-là, tu le gardes.' }; }
+  ];
+
+  function goalBannerHTML(doneCount, weeklyGoal, isCurrentWeek, weekStartISO) {
     if (!isCurrentWeek || doneCount < weeklyGoal) return '';
+    var s = doneCount > 1 ? 's' : '';
     var name = state.profile.name ? ', ' + esc(state.profile.name) : '';
+    var msg = GOAL_MESSAGES[hashStr(weekStartISO) % GOAL_MESSAGES.length](doneCount, s, name);
     return '<div class="goal-banner">' +
-      '<div class="gb-title">🎉 Objectif de la semaine atteint !</div>' +
-      '<div class="gb-sub">' + doneCount + ' séance' + (doneCount > 1 ? 's' : '') + ' cette semaine' + name + ' — bravo. Ça repart à zéro lundi.</div>' +
+      '<div class="gb-title">' + msg.title + '</div>' +
+      '<div class="gb-sub">' + msg.body + ' Ça repart à zéro lundi.</div>' +
       '</div>';
   }
+
 
   /* ==========================================================================
      Vue Jour
@@ -552,7 +566,7 @@
       '<div class="stat-tile"><div class="value good">' + (adherenceRate(mealsInRange(iso, iso)) === null ? '–' : adherenceRate(mealsInRange(iso, iso)) + '%') + '</div><div class="label">diète du jour</div></div>' +
       '</div>';
 
-    html += goalBannerHTML(doneThisWeek, state.profile.weeklyGoal, true);
+    html += goalBannerHTML(doneThisWeek, state.profile.weeklyGoal, true, isoFromDate(weekMonday));
 
     html += '<div class="card">';
     html += '<div class="card-title">Séance du jour</div>';
@@ -656,7 +670,7 @@
       '<div class="stat-tile"><div class="value good">' + (adherence === null ? '–' : adherence + '%') + '</div><div class="label">diète<br/>respectée</div></div>' +
       '</div>';
 
-    html += goalBannerHTML(doneCount, state.profile.weeklyGoal, ui.weekOffset === 0);
+    html += goalBannerHTML(doneCount, state.profile.weeklyGoal, ui.weekOffset === 0, startISO);
 
     html += '<div class="card"><div class="card-title">Minutes d’entraînement <span class="sub">par jour</span></div>';
     html += '<figure class="chart-figure">' + barChartWeek(dayLabels, dayValues) + '</figure>';
