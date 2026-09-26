@@ -478,7 +478,7 @@
      ========================================================================== */
 
   function renderHeader() {
-    var titles = { jour: "Aujourd'hui", semaine: 'Semaine', evolution: 'Évolution' };
+    var titles = { jour: "Aujourd'hui", semaine: 'Semaine', evolution: 'Évolution', historique: 'Historique' };
     document.getElementById('headerTitle').textContent = titles[ui.tab];
     document.getElementById('headerDate').textContent = fmtHeaderDate(new Date());
     document.querySelectorAll('.tab-btn').forEach(function (b) {
@@ -497,6 +497,22 @@
     });
     html += '</div></details>';
     return html;
+  }
+
+  function sessionCardHTML(s) {
+    var t = typeMeta(s.typeId);
+    var exercises = s.exercises || [];
+    var totalSets = exercises.reduce(function (a, ex) { return a + ex.sets.length; }, 0);
+    return '<div class="session-card" style="margin-bottom:10px;">' +
+      '<div class="session-row">' +
+      '<div class="session-dot" style="background:' + t.color + '1a;border-color:' + t.color + '55;">' + t.icon + '</div>' +
+      '<div class="session-info"><div class="t">' + esc(t.label) + '</div><div class="d">' + minutesToLabel(s.duration) + ' • intensité ' + s.intensity + '/5' + (totalSets ? ' • ' + totalSets + ' séries' : '') + (s.note ? ' • ' + esc(s.note) : '') + '</div></div>' +
+      '<div class="session-actions">' +
+      '<button class="btn-check' + (s.done ? ' done' : '') + '" data-action="toggle-session" data-id="' + s.id + '" aria-label="Marquer fait">✓</button>' +
+      '<button class="btn-del" data-action="delete-session" data-id="' + s.id + '" aria-label="Supprimer">✕</button>' +
+      '</div></div>' +
+      (exercises.length ? renderExerciseSummary(exercises) : '') +
+      '</div>';
   }
 
   /* ==========================================================================
@@ -532,21 +548,7 @@
     if (todays.length === 0) {
       html += '<div class="empty-state">Aucune séance enregistrée aujourd’hui.</div>';
     } else {
-      todays.forEach(function (s) {
-        var t = typeMeta(s.typeId);
-        var exercises = s.exercises || [];
-        var totalSets = exercises.reduce(function (a, ex) { return a + ex.sets.length; }, 0);
-        html += '<div class="session-card" style="margin-bottom:10px;">' +
-          '<div class="session-row">' +
-          '<div class="session-dot" style="background:' + t.color + '1a;border-color:' + t.color + '55;">' + t.icon + '</div>' +
-          '<div class="session-info"><div class="t">' + esc(t.label) + '</div><div class="d">' + minutesToLabel(s.duration) + ' • intensité ' + s.intensity + '/5' + (totalSets ? ' • ' + totalSets + ' séries' : '') + (s.note ? ' • ' + esc(s.note) : '') + '</div></div>' +
-          '<div class="session-actions">' +
-          '<button class="btn-check' + (s.done ? ' done' : '') + '" data-action="toggle-session" data-id="' + s.id + '" aria-label="Marquer fait">✓</button>' +
-          '<button class="btn-del" data-action="delete-session" data-id="' + s.id + '" aria-label="Supprimer">✕</button>' +
-          '</div></div>' +
-          (exercises.length ? renderExerciseSummary(exercises) : '') +
-          '</div>';
-      });
+      todays.forEach(function (s) { html += sessionCardHTML(s); });
     }
     html += '<button class="btn-add-inline" data-action="open-sheet" data-sheet="session" style="margin-top:4px;">+ Ajouter une séance</button>';
     html += '</div>';
@@ -573,6 +575,36 @@
       var btn = view.querySelector('.meal-status-btn[data-slot="' + slot.id + '"][data-status="' + m.status + '"]');
       if (btn) btn.classList.add('active');
     });
+  }
+
+  /* ==========================================================================
+     Vue Historique
+     ========================================================================== */
+
+  function renderHistorique() {
+    var byDate = {};
+    state.sessions.forEach(function (s) {
+      if (!byDate[s.date]) byDate[s.date] = [];
+      byDate[s.date].push(s);
+    });
+    var dates = Object.keys(byDate).sort(function (a, b) { return a < b ? 1 : (a > b ? -1 : 0); });
+
+    var html = '';
+    html += '<button class="btn-add-inline" data-action="open-sheet" data-sheet="session">+ Ajouter une séance</button>';
+
+    if (dates.length === 0) {
+      html += '<div class="card"><div class="empty-state">Aucune séance enregistrée pour l’instant.</div></div>';
+    } else {
+      dates.forEach(function (dateISO) {
+        var daySessions = byDate[dateISO];
+        html += '<div class="card">';
+        html += '<div class="card-title">' + esc(fmtHeaderDate(parseISO(dateISO))) + '</div>';
+        daySessions.forEach(function (s) { html += sessionCardHTML(s); });
+        html += '</div>';
+      });
+    }
+
+    document.getElementById('view').innerHTML = html;
   }
 
   /* ==========================================================================
@@ -960,6 +992,7 @@
     renderHeader();
     if (ui.tab === 'jour') renderDay();
     else if (ui.tab === 'semaine') renderWeek();
+    else if (ui.tab === 'historique') renderHistorique();
     else renderEvolution();
   }
 
