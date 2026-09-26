@@ -806,7 +806,17 @@
 
   function renderSheet() {
     var c = document.getElementById('sheetContent');
-    if (ui.sheet === 'session') {
+    if (ui.sheet === 'whatsnew') {
+      var htmlNew = '<div class="sheet-handle"></div><h2>Quoi de neuf 🎉</h2>';
+      htmlNew += '<div class="whats-new-list">';
+      htmlNew += '<div class="whats-new-item"><span class="wn-icon">🕰️</span><div><b>Onglet Historique</b><span>Retrouve toutes tes séances passées, groupées par date, en bas de l’app.</span></div></div>';
+      htmlNew += '<div class="whats-new-item"><span class="wn-icon">📅</span><div><b>Séance oubliée ?</b><span>Dans « + Ajouter une séance », change simplement le champ <b>Date</b> pour le jour passé — elle apparaîtra dans Historique.</span></div></div>';
+      htmlNew += '<div class="whats-new-item"><span class="wn-icon">🏋️</span><div><b>Exercices détaillés</b><span>Ajoute tes exercices avec séries, répétitions et charges (kg) à chaque séance.</span></div></div>';
+      htmlNew += '<div class="whats-new-item"><span class="wn-icon">📈</span><div><b>Progression des charges</b><span>Dans l’onglet Évolution, vois en un coup d’œil si tu augmentes tes charges, exercice par exercice.</span></div></div>';
+      htmlNew += '</div>';
+      htmlNew += '<button class="btn-primary" data-action="close-whatsnew">Compris !</button>';
+      c.innerHTML = htmlNew;
+    } else if (ui.sheet === 'session') {
       var d = ui.draft;
       var html = '<div class="sheet-handle"></div><h2>Ajouter une séance</h2>';
       html += '<div class="field"><label>Type de séance</label><div class="type-grid">';
@@ -931,6 +941,22 @@
       if (!cached) toast('Impossible de charger tes données (hors-ligne ?)');
       else toast('Hors-ligne — dernières données enregistrées');
     });
+    maybeShowWhatsNew();
+  }
+
+  var NOTICE_VERSION = 'historique-2026-09';
+  var NOTICE_KEY = 'jsc.notice.seen';
+
+  function maybeShowWhatsNew() {
+    var seen = null;
+    try { seen = localStorage.getItem(NOTICE_KEY); } catch (e) {}
+    if (seen === NOTICE_VERSION) return;
+    openSheet('whatsnew');
+  }
+
+  function dismissWhatsNew() {
+    try { localStorage.setItem(NOTICE_KEY, NOTICE_VERSION); } catch (e) {}
+    closeSheet();
   }
 
   function logout() {
@@ -1036,6 +1062,7 @@
     if (action === 'period-chip') { ui.period = el.getAttribute('data-period'); render(); return; }
     if (action === 'open-sheet') { openSheet(el.getAttribute('data-sheet')); return; }
     if (action === 'close-sheet') { closeSheet(); return; }
+    if (action === 'close-whatsnew') { dismissWhatsNew(); return; }
     if (action === 'draft-type') { ui.draft.typeId = el.getAttribute('data-type'); renderSheet(); return; }
     if (action === 'draft-duration') {
       var delta = parseInt(el.getAttribute('data-delta'), 10);

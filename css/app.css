@@ -940,6 +940,29 @@ main.view {
 .quick-action .qt { font-weight: 700; font-size: 15px; }
 .quick-action .qs { font-size: 12px; color: var(--text-muted); }
 
+/* ---------- Quoi de neuf ---------- */
+.whats-new-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.whats-new-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.whats-new-item .wn-icon {
+  font-size: 22px;
+  flex: none;
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  display: flex; align-items: center; justify-content: center;
+}
+.whats-new-item b { display: block; font-size: 14.5px; margin-bottom: 3px; }
+.whats-new-item span { font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
+
 .toast {
   position: fixed;
   left: 50%; bottom: calc(96px + var(--safe-bottom));
