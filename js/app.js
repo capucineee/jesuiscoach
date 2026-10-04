@@ -508,6 +508,7 @@
       '<div class="session-dot" style="background:' + t.color + '1a;border-color:' + t.color + '55;">' + t.icon + '</div>' +
       '<div class="session-info"><div class="t">' + esc(t.label) + '</div><div class="d">' + minutesToLabel(s.duration) + ' • intensité ' + s.intensity + '/5' + (totalSets ? ' • ' + totalSets + ' séries' : '') + (s.note ? ' • ' + esc(s.note) : '') + '</div></div>' +
       '<div class="session-actions">' +
+      '<button class="btn-dup" data-action="duplicate-session" data-id="' + s.id + '" aria-label="Dupliquer la séance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
       '<button class="btn-check' + (s.done ? ' done' : '') + '" data-action="toggle-session" data-id="' + s.id + '" aria-label="Marquer fait">✓</button>' +
       '<button class="btn-del" data-action="delete-session" data-id="' + s.id + '" aria-label="Supprimer">✕</button>' +
       '</div></div>' +
@@ -816,14 +817,31 @@
      Sheets (formulaires)
      ========================================================================== */
 
-  function openSheet(name) {
+  function openSheet(name, draftOverride) {
     ui.sheet = name;
-    ui.draft = name === 'session' ? { date: todayISO(), typeId: 'muscu', duration: 45, intensity: 3, note: '', exercises: [] }
+    ui.draft = draftOverride || (name === 'session' ? { date: todayISO(), typeId: 'muscu', duration: 45, intensity: 3, note: '', exercises: [] }
       : name === 'weight' ? { date: todayISO(), kg: '' }
       : name === 'settings' ? { name: state.profile.name, weeklyGoal: state.profile.weeklyGoal }
-      : {};
+      : {});
     renderSheet();
     document.getElementById('sheetOverlay').classList.add('open');
+  }
+
+  function duplicateSession(id) {
+    var s = state.sessions.filter(function (x) { return x.id === id; })[0];
+    if (!s) return;
+    var clonedExercises = (s.exercises || []).map(function (ex) {
+      return { id: uid(), name: ex.name, sets: ex.sets.map(function (st) { return { weight: st.weight, reps: st.reps }; }) };
+    });
+    openSheet('session', {
+      date: todayISO(),
+      typeId: s.typeId,
+      duration: s.duration,
+      intensity: s.intensity,
+      note: s.note || '',
+      exercises: clonedExercises
+    });
+    toast('Séance dupliquée — vérifie et enregistre 👍');
   }
 
   function closeSheet() {
@@ -1074,6 +1092,7 @@
       deleteSession(el.getAttribute('data-id')).then(render).catch(function (err) { toast(err.message); });
       return;
     }
+    if (action === 'duplicate-session') { duplicateSession(el.getAttribute('data-id')); return; }
     if (action === 'meal-status') {
       setMealStatus(el.getAttribute('data-date'), el.getAttribute('data-slot'), el.getAttribute('data-status'))
         .then(render).catch(function (err) { toast(err.message); });
