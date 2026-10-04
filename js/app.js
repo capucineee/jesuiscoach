@@ -27,6 +27,25 @@
       { id: 'P6', name: 'Tofu et lentilles', kcal: 600, p: 48, g: 57, l: 16 },
       { id: 'P7', name: 'Bavette grillée et pommes de terre', kcal: 605, p: 54, g: 61, l: 15 }
     ],
+    // Sources de protéines et féculents du repas, pour composer un déjeuner/dîner
+    // qui ne correspond pas exactement à une des 7 lignes ci-dessus (ex: poulet +
+    // pommes de terre). Valeurs estimées à partir des grammages du plan ; les
+    // féculents incluent l'accompagnement légumes + huile habituel.
+    protein: [
+      { id: 'POULET', name: 'Poulet', kcal: 200, p: 41, g: 0, l: 3 },
+      { id: 'DINDE', name: 'Dinde', kcal: 190, p: 43, g: 0, l: 2 },
+      { id: 'STEAK', name: 'Steak haché 5 %', kcal: 240, p: 42, g: 0, l: 10 },
+      { id: 'POISSON', name: 'Poisson blanc', kcal: 205, p: 45, g: 0, l: 2 },
+      { id: 'SAUMON', name: 'Saumon', kcal: 215, p: 24, g: 0, l: 13 },
+      { id: 'TOFU', name: 'Tofu ferme', kcal: 220, p: 23, g: 3, l: 14 },
+      { id: 'BAVETTE', name: 'Bavette', kcal: 250, p: 42, g: 0, l: 9 }
+    ],
+    carb: [
+      { id: 'PATES', name: 'Pâtes complètes (+ légumes)', kcal: 390, p: 13, g: 61, l: 10 },
+      { id: 'RIZ', name: 'Riz (+ légumes)', kcal: 400, p: 9, g: 62, l: 12 },
+      { id: 'PDT', name: 'Pommes de terre (+ légumes)', kcal: 360, p: 13, g: 57, l: 6 },
+      { id: 'LENTILLES', name: 'Lentilles (+ légumes)', kcal: 360, p: 22, g: 55, l: 2 }
+    ],
     snack: [
       { id: 'C1', name: 'Skyr, banane et Kinder', kcal: 340, p: 23, g: 40, l: 10 },
       { id: 'C2', name: 'Fromage blanc, banane et amandes', kcal: 355, p: 24, g: 37, l: 12 },
@@ -38,12 +57,16 @@
     ]
   };
   var DIET_TARGETS = { kcal: 2200, protein: 180 };
+  // Blocs simples (une seule option à choisir) : petit-déjeuner, goûter, dessert.
+  // Le déjeuner et le dîner ont leur propre logique (protéine + féculent) gérée à part.
   var DIET_SLOTS = [
     { field: 'breakfast', label: 'Petit-déjeuner', category: 'breakfast' },
-    { field: 'lunch', label: 'Déjeuner', category: 'mainMeal' },
     { field: 'snack', label: 'Goûter', category: 'snack' },
-    { field: 'dinner', label: 'Dîner', category: 'mainMeal', allowRestaurant: true },
     { field: 'dessert', label: 'Dessert du soir', category: 'dessert' }
+  ];
+  var DIET_MEALS = [
+    { field: 'lunch', label: 'Déjeuner' },
+    { field: 'dinner', label: 'Dîner', allowRestaurant: true }
   ];
 
   var QUOTES = [
@@ -270,21 +293,35 @@
       if (!opt) return;
       total.kcal += opt.kcal; total.p += opt.p; total.g += opt.g; total.l += opt.l;
     }
-    function addSlot(field, category) {
-      if (d[field] === 'CUSTOM') {
-        var cm = d.customMeals && d.customMeals[field];
-        if (cm) total.kcal += cm.kcal || 0;
-      } else {
-        add(findDietOption(category, d[field]));
-      }
+    function addCustom(field) {
+      var cm = d.customMeals && d.customMeals[field];
+      if (cm) total.kcal += cm.kcal || 0;
     }
+    function addSlot(field, category) {
+      if (d[field] === 'CUSTOM') addCustom(field);
+      else add(findDietOption(category, d[field]));
+    }
+    function addMeal(field) {
+      var proteinField = field + '_protein', carbField = field + '_carb';
+      var hasNew = !!(d[proteinField] || d[carbField]);
+      // Rétrocompatibilité : un ancien choix (plat complet ou repas personnalisé global)
+      // reste compté tel quel tant qu'aucune protéine/féculent séparé n'a été choisi.
+      if (!hasNew && d[field] === 'CUSTOM') { addCustom(field); return; }
+      if (!hasNew && d[field] && findDietOption('mainMeal', d[field])) { add(findDietOption('mainMeal', d[field])); return; }
+      // Nouveau mode : protéine + féculent choisis séparément.
+      if (d[proteinField] === 'CUSTOM') addCustom(proteinField);
+      else add(findDietOption('protein', d[proteinField]));
+      if (d[carbField] === 'CUSTOM') addCustom(carbField);
+      else add(findDietOption('carb', d[carbField]));
+    }
+
     addSlot('breakfast', 'breakfast');
-    addSlot('lunch', 'mainMeal');
+    addMeal('lunch');
     addSlot('snack', 'snack');
     if (d.dinner === 'RESTAURANT') {
       total.kcal += d.restaurantKcal || 0;
     } else {
-      addSlot('dinner', 'mainMeal');
+      addMeal('dinner');
       addSlot('dessert', 'dessert');
     }
     return total;
@@ -296,6 +333,8 @@
       existing.breakfast = row.breakfast; existing.lunch = row.lunch; existing.snack = row.snack;
       existing.dinner = row.dinner; existing.dessert = row.dessert; existing.restaurantKcal = row.restaurantKcal;
       existing.customMeals = row.customMeals;
+      existing.lunch_protein = row.lunch_protein; existing.lunch_carb = row.lunch_carb;
+      existing.dinner_protein = row.dinner_protein; existing.dinner_carb = row.dinner_carb;
     } else {
       state.dietDays.push(row);
     }
@@ -882,40 +921,86 @@
       '<div class="stat-tile"><div class="value good">' + (totals.kcal ? Math.round(totals.kcal / DIET_TARGETS.kcal * 100) + '%' : '–') + '</div><div class="label">de l’objectif<br/>kcal</div></div>' +
       '</div>';
 
+    function optionRowHTML(field, opt, activeValue) {
+      var active = activeValue === opt.id;
+      return '<div class="diet-option-row' + (active ? ' active' : '') + '" data-action="pick-diet" data-field="' + field + '" data-value="' + opt.id + '">' +
+        '<div class="dor-name">' + esc(opt.name) + '</div>' +
+        '<div class="dor-kcal">' + opt.kcal + ' kcal</div>' +
+        '</div>';
+    }
+
+    function customRowHTML(field, activeValue, label) {
+      var customData = (d && d.customMeals && d.customMeals[field]) || null;
+      var active = activeValue === 'CUSTOM';
+      return '<div class="diet-option-row' + (active ? ' active' : '') + '" data-action="pick-diet" data-field="' + field + '" data-value="CUSTOM">' +
+        '<div class="dor-name">✏️ ' + esc(label) + '</div>' +
+        '<div class="dor-kcal">' + (customData && customData.kcal ? customData.kcal + ' kcal' : '?') + '</div>' +
+        '</div>';
+    }
+
+    function customInputsHTML(field) {
+      var customData = (d && d.customMeals && d.customMeals[field]) || null;
+      return '<div class="field" style="margin-top:14px;"><label>Nom (optionnel)</label>' +
+        '<input type="text" id="customName-' + field + '" placeholder="Ex: Sandwich jambon" value="' + esc((customData && customData.name) || '') + '"/></div>' +
+        '<div class="field"><label>Calories (kcal)</label>' +
+        '<input type="number" id="customKcal-' + field + '" placeholder="Ex: 450" value="' + ((customData && customData.kcal) || '') + '"/></div>';
+    }
+
     DIET_SLOTS.forEach(function (slot) {
       if (slot.field === 'dessert' && isRestaurant) return;
       var currentValue = d ? d[slot.field] : null;
       html += '<div class="card"><div class="card-title">' + esc(slot.label) + '</div><div class="diet-option-list">';
-      DIET_PLAN[slot.category].forEach(function (opt) {
-        var active = currentValue === opt.id;
-        html += '<div class="diet-option-row' + (active ? ' active' : '') + '" data-action="pick-diet" data-field="' + slot.field + '" data-value="' + opt.id + '">' +
-          '<div class="dor-name">' + esc(opt.name) + '</div>' +
-          '<div class="dor-kcal">' + opt.kcal + ' kcal</div>' +
-          '</div>';
-      });
-      if (slot.allowRestaurant) {
-        html += '<div class="diet-option-row' + (isRestaurant ? ' active' : '') + '" data-action="pick-diet" data-field="dinner" data-value="RESTAURANT">' +
-          '<div class="dor-name">🍽️ Restaurant <span class="dor-note">remplace dîner + dessert</span></div>' +
-          '<div class="dor-kcal">' + (isRestaurant && d.restaurantKcal ? d.restaurantKcal + ' kcal' : '?') + '</div>' +
-          '</div>';
-      }
-      var isCustom = currentValue === 'CUSTOM';
-      var customData = (d && d.customMeals && d.customMeals[slot.field]) || null;
-      html += '<div class="diet-option-row' + (isCustom ? ' active' : '') + '" data-action="pick-diet" data-field="' + slot.field + '" data-value="CUSTOM">' +
-        '<div class="dor-name">✏️ Repas personnalisé</div>' +
-        '<div class="dor-kcal">' + (customData && customData.kcal ? customData.kcal + ' kcal' : '?') + '</div>' +
-        '</div>';
+      DIET_PLAN[slot.category].forEach(function (opt) { html += optionRowHTML(slot.field, opt, currentValue); });
+      html += customRowHTML(slot.field, currentValue, 'Repas personnalisé');
       html += '</div>';
-      if (slot.allowRestaurant && isRestaurant) {
-        html += '<div class="field" style="margin-top:14px;"><label>Estimation du repas restaurant (kcal)</label>' +
-          '<input type="number" id="restaurantKcalInput" placeholder="Ex: 900" value="' + (d.restaurantKcal || '') + '"/></div>';
+      if (currentValue === 'CUSTOM') html += customInputsHTML(slot.field);
+      html += '</div>';
+    });
+
+    DIET_MEALS.forEach(function (meal) {
+      var field = meal.field;
+      var mealIsRestaurant = !!(meal.allowRestaurant && isRestaurant);
+      html += '<div class="card"><div class="card-title">' + esc(meal.label) + '</div>';
+
+      if (meal.allowRestaurant) {
+        html += '<div class="diet-option-list"><div class="diet-option-row' + (mealIsRestaurant ? ' active' : '') + '" data-action="pick-diet" data-field="dinner" data-value="RESTAURANT">' +
+          '<div class="dor-name">🍽️ Restaurant <span class="dor-note">remplace dîner + dessert</span></div>' +
+          '<div class="dor-kcal">' + (mealIsRestaurant && d.restaurantKcal ? d.restaurantKcal + ' kcal' : '?') + '</div>' +
+          '</div></div>';
+        if (mealIsRestaurant) {
+          html += '<div class="field" style="margin-top:14px;"><label>Estimation du repas restaurant (kcal)</label>' +
+            '<input type="number" id="restaurantKcalInput" placeholder="Ex: 900" value="' + (d.restaurantKcal || '') + '"/></div>';
+        }
       }
-      if (isCustom) {
-        html += '<div class="field" style="margin-top:14px;"><label>Nom du repas (optionnel)</label>' +
-          '<input type="text" id="customName-' + slot.field + '" placeholder="Ex: Sandwich jambon" value="' + esc((customData && customData.name) || '') + '"/></div>';
-        html += '<div class="field"><label>Calories (kcal)</label>' +
-          '<input type="number" id="customKcal-' + slot.field + '" placeholder="Ex: 450" value="' + ((customData && customData.kcal) || '') + '"/></div>';
+
+      if (!mealIsRestaurant) {
+        var proteinField = field + '_protein', carbField = field + '_carb';
+        var proteinVal = d ? d[proteinField] : null;
+        var carbVal = d ? d[carbField] : null;
+        var legacyOpt = (d && !proteinVal && !carbVal && d[field] && d[field] !== 'CUSTOM') ? findDietOption('mainMeal', d[field]) : null;
+
+        if (legacyOpt) {
+          html += '<div class="dor-note" style="margin:12px 2px 14px;">Ancienne sélection : ' + esc(legacyOpt.name) + ' (' + legacyOpt.kcal + ' kcal). Choisis une protéine et un féculent ci-dessous pour la remplacer.</div>';
+        }
+
+        html += '<div class="diet-subheading">Source de protéines</div><div class="diet-option-list">';
+        DIET_PLAN.protein.forEach(function (opt) { html += optionRowHTML(proteinField, opt, proteinVal); });
+        html += customRowHTML(proteinField, proteinVal, 'Protéine personnalisée');
+        html += '</div>';
+        if (proteinVal === 'CUSTOM') html += customInputsHTML(proteinField);
+
+        html += '<div class="diet-subheading">Féculent / glucides</div><div class="diet-option-list">';
+        DIET_PLAN.carb.forEach(function (opt) { html += optionRowHTML(carbField, opt, carbVal); });
+        html += customRowHTML(carbField, carbVal, 'Féculent personnalisé');
+        html += '</div>';
+        if (carbVal === 'CUSTOM') html += customInputsHTML(carbField);
+
+        html += '<div class="diet-subheading">Autre</div><div class="diet-option-list">';
+        html += customRowHTML(field, (!proteinVal && !carbVal) ? d && d[field] : null, 'Repas personnalisé (plat complet)');
+        html += '</div>';
+        if (!proteinVal && !carbVal && d && d[field] === 'CUSTOM') html += customInputsHTML(field);
       }
+
       html += '</div>';
     });
 
@@ -928,12 +1013,16 @@
         pickDietOption(ui.dietDate, 'restaurantKcal', isNaN(val) ? null : val).then(render);
       });
     }
-    DIET_SLOTS.forEach(function (slot) {
-      var nameInput = document.getElementById('customName-' + slot.field);
-      var kcalInput = document.getElementById('customKcal-' + slot.field);
+    var customCapableFields = DIET_SLOTS.map(function (slot) { return slot.field; });
+    DIET_MEALS.forEach(function (meal) {
+      customCapableFields.push(meal.field, meal.field + '_protein', meal.field + '_carb');
+    });
+    customCapableFields.forEach(function (field) {
+      var nameInput = document.getElementById('customName-' + field);
+      var kcalInput = document.getElementById('customKcal-' + field);
       if (!kcalInput) return;
       var handler = function () {
-        var p = saveCustomMeal(slot.field);
+        var p = saveCustomMeal(field);
         if (p) p.then(render);
       };
       nameInput.addEventListener('change', handler);

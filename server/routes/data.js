@@ -34,7 +34,11 @@ function mapDietDay(row) {
     dinner: row.dinner,
     dessert: row.dessert,
     restaurantKcal: row.restaurant_kcal,
-    customMeals: row.custom_meals || {}
+    customMeals: row.custom_meals || {},
+    lunch_protein: row.lunch_protein,
+    lunch_carb: row.lunch_carb,
+    dinner_protein: row.dinner_protein,
+    dinner_carb: row.dinner_carb
   };
 }
 
@@ -127,8 +131,13 @@ router.delete('/weights/:id', async function (req, res) {
 
 // ---------- Diète ----------
 
-var DIET_FIELDS = { breakfast: 'breakfast', lunch: 'lunch', snack: 'snack', dinner: 'dinner', dessert: 'dessert', restaurantKcal: 'restaurant_kcal' };
-var DIET_SLOT_FIELDS = ['breakfast', 'lunch', 'snack', 'dinner', 'dessert'];
+var DIET_FIELDS = {
+  breakfast: 'breakfast', lunch: 'lunch', snack: 'snack', dinner: 'dinner', dessert: 'dessert',
+  restaurantKcal: 'restaurant_kcal',
+  lunch_protein: 'lunch_protein', lunch_carb: 'lunch_carb',
+  dinner_protein: 'dinner_protein', dinner_carb: 'dinner_carb'
+};
+var DIET_SLOT_FIELDS = ['breakfast', 'lunch', 'snack', 'dinner', 'dessert', 'lunch_protein', 'lunch_carb', 'dinner_protein', 'dinner_carb'];
 
 router.put('/diet', async function (req, res) {
   var b = req.body || {};
