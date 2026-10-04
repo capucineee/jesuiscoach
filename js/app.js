@@ -270,16 +270,36 @@
       if (!opt) return;
       total.kcal += opt.kcal; total.p += opt.p; total.g += opt.g; total.l += opt.l;
     }
-    add(findDietOption('breakfast', d.breakfast));
-    add(findDietOption('mainMeal', d.lunch));
-    add(findDietOption('snack', d.snack));
+    function addSlot(field, category) {
+      if (d[field] === 'CUSTOM') {
+        var cm = d.customMeals && d.customMeals[field];
+        if (cm) total.kcal += cm.kcal || 0;
+      } else {
+        add(findDietOption(category, d[field]));
+      }
+    }
+    addSlot('breakfast', 'breakfast');
+    addSlot('lunch', 'mainMeal');
+    addSlot('snack', 'snack');
     if (d.dinner === 'RESTAURANT') {
       total.kcal += d.restaurantKcal || 0;
     } else {
-      add(findDietOption('mainMeal', d.dinner));
-      add(findDietOption('dessert', d.dessert));
+      addSlot('dinner', 'mainMeal');
+      addSlot('dessert', 'dessert');
     }
     return total;
+  }
+
+  function applyDietRow(dateISO, row) {
+    var existing = dietDayFor(dateISO);
+    if (existing) {
+      existing.breakfast = row.breakfast; existing.lunch = row.lunch; existing.snack = row.snack;
+      existing.dinner = row.dinner; existing.dessert = row.dessert; existing.restaurantKcal = row.restaurantKcal;
+      existing.customMeals = row.customMeals;
+    } else {
+      state.dietDays.push(row);
+    }
+    cacheStateLocally();
   }
 
   function pickDietOption(dateISO, field, value) {
@@ -287,13 +307,21 @@
     var toggleable = field !== 'restaurantKcal';
     var newValue = (toggleable && existing && existing[field] === value) ? null : value;
     return apiFetch('/api/diet', { method: 'PUT', body: JSON.stringify({ date: dateISO, field: field, value: newValue }) }).then(function (row) {
-      if (existing) {
-        existing.breakfast = row.breakfast; existing.lunch = row.lunch; existing.snack = row.snack;
-        existing.dinner = row.dinner; existing.dessert = row.dessert; existing.restaurantKcal = row.restaurantKcal;
-      } else {
-        state.dietDays.push(row);
-      }
-      cacheStateLocally();
+      applyDietRow(dateISO, row);
+    });
+  }
+
+  function saveCustomMeal(field) {
+    var nameInput = document.getElementById('customName-' + field);
+    var kcalInput = document.getElementById('customKcal-' + field);
+    var kcal = kcalInput ? parseInt(kcalInput.value, 10) : NaN;
+    if (isNaN(kcal) || kcal <= 0) return null;
+    var name = nameInput ? nameInput.value.trim() : '';
+    return apiFetch('/api/diet', {
+      method: 'PUT',
+      body: JSON.stringify({ date: ui.dietDate, field: field, value: 'CUSTOM', customMeal: { name: name, kcal: kcal } })
+    }).then(function (row) {
+      applyDietRow(ui.dietDate, row);
     });
   }
 
@@ -871,10 +899,22 @@
           '<div class="dor-kcal">' + (isRestaurant && d.restaurantKcal ? d.restaurantKcal + ' kcal' : '?') + '</div>' +
           '</div>';
       }
+      var isCustom = currentValue === 'CUSTOM';
+      var customData = (d && d.customMeals && d.customMeals[slot.field]) || null;
+      html += '<div class="diet-option-row' + (isCustom ? ' active' : '') + '" data-action="pick-diet" data-field="' + slot.field + '" data-value="CUSTOM">' +
+        '<div class="dor-name">✏️ Repas personnalisé</div>' +
+        '<div class="dor-kcal">' + (customData && customData.kcal ? customData.kcal + ' kcal' : '?') + '</div>' +
+        '</div>';
       html += '</div>';
       if (slot.allowRestaurant && isRestaurant) {
         html += '<div class="field" style="margin-top:14px;"><label>Estimation du repas restaurant (kcal)</label>' +
           '<input type="number" id="restaurantKcalInput" placeholder="Ex: 900" value="' + (d.restaurantKcal || '') + '"/></div>';
+      }
+      if (isCustom) {
+        html += '<div class="field" style="margin-top:14px;"><label>Nom du repas (optionnel)</label>' +
+          '<input type="text" id="customName-' + slot.field + '" placeholder="Ex: Sandwich jambon" value="' + esc((customData && customData.name) || '') + '"/></div>';
+        html += '<div class="field"><label>Calories (kcal)</label>' +
+          '<input type="number" id="customKcal-' + slot.field + '" placeholder="Ex: 450" value="' + ((customData && customData.kcal) || '') + '"/></div>';
       }
       html += '</div>';
     });
@@ -888,6 +928,17 @@
         pickDietOption(ui.dietDate, 'restaurantKcal', isNaN(val) ? null : val).then(render);
       });
     }
+    DIET_SLOTS.forEach(function (slot) {
+      var nameInput = document.getElementById('customName-' + slot.field);
+      var kcalInput = document.getElementById('customKcal-' + slot.field);
+      if (!kcalInput) return;
+      var handler = function () {
+        var p = saveCustomMeal(slot.field);
+        if (p) p.then(render);
+      };
+      nameInput.addEventListener('change', handler);
+      kcalInput.addEventListener('change', handler);
+    });
   }
 
   function renderExerciseBlock(ex) {

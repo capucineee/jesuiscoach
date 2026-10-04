@@ -83,10 +83,14 @@ async function initSchema() {
       dinner TEXT,
       dessert TEXT,
       restaurant_kcal INTEGER,
+      custom_meals JSONB NOT NULL DEFAULT '{}',
       UNIQUE(user_id, date)
     );
     CREATE INDEX IF NOT EXISTS diet_days_user_date_idx ON diet_days(user_id, date);
   `);
+
+  // Migration : custom_meals a été ajoutée après la création initiale de diet_days sur certains environnements.
+  await pool.query(`ALTER TABLE diet_days ADD COLUMN IF NOT EXISTS custom_meals JSONB NOT NULL DEFAULT '{}'`);
 
   var counts = await pool.query(
     'SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM sessions) AS sessions'

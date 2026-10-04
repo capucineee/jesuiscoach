@@ -33,7 +33,8 @@ function mapDietDay(row) {
     snack: row.snack,
     dinner: row.dinner,
     dessert: row.dessert,
-    restaurantKcal: row.restaurant_kcal
+    restaurantKcal: row.restaurant_kcal,
+    customMeals: row.custom_meals || {}
   };
 }
 
@@ -127,16 +128,36 @@ router.delete('/weights/:id', async function (req, res) {
 // ---------- Diète ----------
 
 var DIET_FIELDS = { breakfast: 'breakfast', lunch: 'lunch', snack: 'snack', dinner: 'dinner', dessert: 'dessert', restaurantKcal: 'restaurant_kcal' };
+var DIET_SLOT_FIELDS = ['breakfast', 'lunch', 'snack', 'dinner', 'dessert'];
 
 router.put('/diet', async function (req, res) {
   var b = req.body || {};
   var column = DIET_FIELDS[b.field];
   if (!column) return res.status(400).json({ error: 'Champ de diète invalide.' });
   var value = b.value === undefined ? null : b.value;
+  var isSlot = DIET_SLOT_FIELDS.indexOf(b.field) !== -1;
+
+  var existing = await pool.query('SELECT custom_meals FROM diet_days WHERE user_id = $1 AND date = $2', [req.userId, b.date]);
+  var customMeals = (existing.rows[0] && existing.rows[0].custom_meals) || {};
+
+  if (isSlot) {
+    if (value === 'CUSTOM') {
+      var cm = b.customMeal || {};
+      customMeals = Object.assign({}, customMeals);
+      customMeals[b.field] = {
+        name: String(cm.name || '').trim().slice(0, 80),
+        kcal: Math.max(0, parseInt(cm.kcal, 10) || 0)
+      };
+    } else if (customMeals[b.field]) {
+      customMeals = Object.assign({}, customMeals);
+      delete customMeals[b.field];
+    }
+  }
+
   var result = await pool.query(
-    'INSERT INTO diet_days (user_id, date, ' + column + ') VALUES ($1,$2,$3) ' +
-    'ON CONFLICT (user_id, date) DO UPDATE SET ' + column + ' = $3 RETURNING *',
-    [req.userId, b.date, value]
+    'INSERT INTO diet_days (user_id, date, ' + column + ', custom_meals) VALUES ($1,$2,$3,$4) ' +
+    'ON CONFLICT (user_id, date) DO UPDATE SET ' + column + ' = $3, custom_meals = $4 RETURNING *',
+    [req.userId, b.date, value, JSON.stringify(customMeals)]
   );
   res.json(mapDietDay(result.rows[0]));
 });
