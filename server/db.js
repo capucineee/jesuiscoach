@@ -72,6 +72,20 @@ async function initSchema() {
       UNIQUE(user_id, date)
     );
     CREATE INDEX IF NOT EXISTS weights_user_date_idx ON weights(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS diet_days (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date DATE NOT NULL,
+      breakfast TEXT,
+      lunch TEXT,
+      snack TEXT,
+      dinner TEXT,
+      dessert TEXT,
+      restaurant_kcal INTEGER,
+      UNIQUE(user_id, date)
+    );
+    CREATE INDEX IF NOT EXISTS diet_days_user_date_idx ON diet_days(user_id, date);
   `);
 
   var counts = await pool.query(

@@ -12,19 +12,39 @@
     { id: 'autre',   label: 'Autres',      icon: '⭐',  color: '#eda100' }
   ];
 
-  var MEAL_SLOTS = [
-    { id: 'petit-dej', label: 'Petit-déjeuner' },
-    { id: 'dejeuner',  label: 'Déjeuner' },
-    { id: 'diner',     label: 'Dîner' },
-    { id: 'collation', label: 'Collations' }
-  ];
-
-  var MEAL_STATUS_META = {
-    ok:    { icon: '✓', label: 'Respecté' },
-    ecart: { icon: '~',      label: 'Petit écart' },
-    'raté': { icon: '✕', label: 'Pas respecté' }
+  var DIET_PLAN = {
+    breakfast: [
+      { id: 'B1', name: 'Œufs, courgettes et tartine', kcal: 460, p: 29, g: 27, l: 25 },
+      { id: 'B2', name: 'Bol de skyr', kcal: 450, p: 32, g: 34, l: 20 },
+      { id: 'B3', name: 'Pancakes à l’avoine', kcal: 460, p: 32, g: 33, l: 21 }
+    ],
+    mainMeal: [
+      { id: 'P1', name: 'Poulet et pâtes complètes', kcal: 590, p: 55, g: 56, l: 14 },
+      { id: 'P2', name: 'Dinde et riz', kcal: 595, p: 52, g: 61, l: 14 },
+      { id: 'P3', name: 'Steak haché 5 % et pommes de terre', kcal: 600, p: 55, g: 56, l: 16 },
+      { id: 'P4', name: 'Poisson blanc et riz', kcal: 605, p: 54, g: 61, l: 13 },
+      { id: 'P5', name: 'Saumon, pâtes et sauce au skyr', kcal: 605, p: 51, g: 52, l: 19 },
+      { id: 'P6', name: 'Tofu et lentilles', kcal: 600, p: 48, g: 57, l: 16 },
+      { id: 'P7', name: 'Bavette grillée et pommes de terre', kcal: 605, p: 54, g: 61, l: 15 }
+    ],
+    snack: [
+      { id: 'C1', name: 'Skyr, banane et Kinder', kcal: 340, p: 23, g: 40, l: 10 },
+      { id: 'C2', name: 'Fromage blanc, banane et amandes', kcal: 355, p: 24, g: 37, l: 12 },
+      { id: 'C3', name: 'Tartine et chocolat', kcal: 330, p: 25, g: 35, l: 9 }
+    ],
+    dessert: [
+      { id: 'S1', name: 'Fromage blanc et pomme', kcal: 220, p: 23, g: 31, l: 1 },
+      { id: 'S2', name: 'Skyr et banane', kcal: 220, p: 24, g: 29, l: 1 }
+    ]
   };
-  var MEAL_STATUS_ORDER = ['ok', 'ecart', 'raté'];
+  var DIET_TARGETS = { kcal: 2200, protein: 180 };
+  var DIET_SLOTS = [
+    { field: 'breakfast', label: 'Petit-déjeuner', category: 'breakfast' },
+    { field: 'lunch', label: 'Déjeuner', category: 'mainMeal' },
+    { field: 'snack', label: 'Goûter', category: 'snack' },
+    { field: 'dinner', label: 'Dîner', category: 'mainMeal', allowRestaurant: true },
+    { field: 'dessert', label: 'Dessert du soir', category: 'dessert' }
+  ];
 
   var QUOTES = [
     "Chaque séance compte, {name}. Un pas de plus vers l'objectif.",
@@ -152,7 +172,8 @@
       profile: { name: '', weeklyGoal: 4 },
       sessions: [],
       meals: [],
-      weights: []
+      weights: [],
+      dietDays: []
     };
   }
 
@@ -162,7 +183,7 @@
 
   var state = defaultState();
   var auth = { token: null, email: '' };
-  var ui = { tab: 'jour', weekOffset: 0, period: '7', customStart: '', customEnd: '', sheet: null, draft: {}, authTab: 'login', authBusy: false };
+  var ui = { tab: 'jour', weekOffset: 0, period: '7', customStart: '', customEnd: '', sheet: null, draft: {}, authTab: 'login', authBusy: false, dietDate: todayISO() };
 
   function loadCachedState() {
     try {
@@ -174,7 +195,8 @@
         profile: Object.assign({}, d.profile, parsed.profile || {}),
         sessions: parsed.sessions || [],
         meals: parsed.meals || [],
-        weights: parsed.weights || []
+        weights: parsed.weights || [],
+        dietDays: parsed.dietDays || []
       };
     } catch (e) { return null; }
   }
@@ -223,29 +245,54 @@
     return state.sessions.filter(function (s) { return s.date >= startISO && s.date <= endISO; });
   }
 
-  function mealsInRange(startISO, endISO) {
-    return state.meals.filter(function (m) { return m.date >= startISO && m.date <= endISO; });
+  function findDietOption(category, id) {
+    if (!id) return null;
+    var list = DIET_PLAN[category] || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
   }
 
-  function mealStatus(dateISO, slotId) {
-    for (var i = 0; i < state.meals.length; i++) {
-      var m = state.meals[i];
-      if (m.date === dateISO && m.slot === slotId) return m;
+  function dietDayFor(dateISO) {
+    for (var i = 0; i < state.dietDays.length; i++) {
+      if (state.dietDays[i].date === dateISO) return state.dietDays[i];
     }
     return null;
   }
 
-  function setMealStatus(dateISO, slotId, status) {
-    var existing = mealStatus(dateISO, slotId);
-    if (existing && existing.status === status) {
-      return apiFetch('/api/meals/' + existing.id, { method: 'DELETE' }).then(function () {
-        state.meals = state.meals.filter(function (m) { return m.id !== existing.id; });
-        cacheStateLocally();
-      });
+  function dietDaysInRange(startISO, endISO) {
+    return state.dietDays.filter(function (d) { return d.date >= startISO && d.date <= endISO; });
+  }
+
+  function dietTotalsForDay(d) {
+    var total = { kcal: 0, p: 0, g: 0, l: 0 };
+    if (!d) return total;
+    function add(opt) {
+      if (!opt) return;
+      total.kcal += opt.kcal; total.p += opt.p; total.g += opt.g; total.l += opt.l;
     }
-    return apiFetch('/api/meals', { method: 'PUT', body: JSON.stringify({ date: dateISO, slot: slotId, status: status }) }).then(function (row) {
-      if (existing) existing.status = row.status;
-      else state.meals.push(row);
+    add(findDietOption('breakfast', d.breakfast));
+    add(findDietOption('mainMeal', d.lunch));
+    add(findDietOption('snack', d.snack));
+    if (d.dinner === 'RESTAURANT') {
+      total.kcal += d.restaurantKcal || 0;
+    } else {
+      add(findDietOption('mainMeal', d.dinner));
+      add(findDietOption('dessert', d.dessert));
+    }
+    return total;
+  }
+
+  function pickDietOption(dateISO, field, value) {
+    var existing = dietDayFor(dateISO);
+    var toggleable = field !== 'restaurantKcal';
+    var newValue = (toggleable && existing && existing[field] === value) ? null : value;
+    return apiFetch('/api/diet', { method: 'PUT', body: JSON.stringify({ date: dateISO, field: field, value: newValue }) }).then(function (row) {
+      if (existing) {
+        existing.breakfast = row.breakfast; existing.lunch = row.lunch; existing.snack = row.snack;
+        existing.dinner = row.dinner; existing.dessert = row.dessert; existing.restaurantKcal = row.restaurantKcal;
+      } else {
+        state.dietDays.push(row);
+      }
       cacheStateLocally();
     });
   }
@@ -315,12 +362,6 @@
       map[s.typeId].minutes += (s.duration || 0);
     });
     return SESSION_TYPES.map(function (t) { return map[t.id]; }).filter(function (e) { return e.count > 0; });
-  }
-
-  function adherenceRate(meals) {
-    if (!meals.length) return null;
-    var ok = meals.filter(function (m) { return m.status === 'ok'; }).length;
-    return Math.round((ok / meals.length) * 100);
   }
 
   function exerciseProgression() {
@@ -478,7 +519,7 @@
      ========================================================================== */
 
   function renderHeader() {
-    var titles = { jour: "Aujourd'hui", semaine: 'Semaine', evolution: 'Évolution', historique: 'Historique' };
+    var titles = { jour: "Aujourd'hui", semaine: 'Semaine', evolution: 'Évolution', historique: 'Historique', diete: 'Diète' };
     document.getElementById('headerTitle').textContent = titles[ui.tab];
     document.getElementById('headerDate').textContent = fmtHeaderDate(new Date());
     document.querySelectorAll('.tab-btn').forEach(function (b) {
@@ -561,10 +602,12 @@
       '<div class="signature">Message du jour</div>' +
       '</div>';
 
+    var todayKcal = dietTotalsForDay(dietDayFor(iso)).kcal;
+
     html += '<div class="stat-row">' +
       '<div class="stat-tile"><div class="value accent">' + doneThisWeek + '/' + state.profile.weeklyGoal + '</div><div class="label">séances<br/>objectif semaine</div></div>' +
       '<div class="stat-tile"><div class="value">' + streak + ' 🔥</div><div class="label">jours de suite</div></div>' +
-      '<div class="stat-tile"><div class="value good">' + (adherenceRate(mealsInRange(iso, iso)) === null ? '–' : adherenceRate(mealsInRange(iso, iso)) + '%') + '</div><div class="label">diète du jour</div></div>' +
+      '<div class="stat-tile"><div class="value good">' + (todayKcal || '–') + '</div><div class="label">kcal du jour<br/>objectif ' + DIET_TARGETS.kcal + '</div></div>' +
       '</div>';
 
     html += goalBannerHTML(doneThisWeek, state.profile.weeklyGoal, true, isoFromDate(weekMonday));
@@ -579,28 +622,9 @@
     html += '<button class="btn-add-inline" data-action="open-sheet" data-sheet="session" style="margin-top:4px;">+ Ajouter une séance</button>';
     html += '</div>';
 
-    html += '<div class="card">';
-    html += '<div class="card-title">Diète du jour <span class="sub">tape pour valider chaque repas</span></div>';
-    MEAL_SLOTS.forEach(function (slot) {
-      var m = mealStatus(iso, slot.id);
-      html += '<div class="meal-row"><div class="m-name">' + esc(slot.label) + '</div><div class="meal-status-group">';
-      MEAL_STATUS_ORDER.forEach(function (st) {
-        html += '<button class="meal-status-btn" data-action="meal-status" data-date="' + iso + '" data-slot="' + slot.id + '" data-status="' + st + '" aria-label="' + esc(MEAL_STATUS_META[st].label) + '">' + MEAL_STATUS_META[st].icon + '</button>';
-      });
-      html += '</div></div>';
-    });
-    html += '</div>';
+    html += '<button class="btn-add-inline" data-action="switch-tab" data-tab="diete">🍽️ Remplir ma diète du jour</button>';
 
-    var view = document.getElementById('view');
-    view.innerHTML = html;
-
-    // fix active class on meal buttons (attribute duplication workaround above)
-    MEAL_SLOTS.forEach(function (slot) {
-      var m = mealStatus(iso, slot.id);
-      if (!m) return;
-      var btn = view.querySelector('.meal-status-btn[data-slot="' + slot.id + '"][data-status="' + m.status + '"]');
-      if (btn) btn.classList.add('active');
-    });
+    document.getElementById('view').innerHTML = html;
   }
 
   /* ==========================================================================
@@ -642,7 +666,7 @@
     var days = weekDates(monday);
     var startISO = isoFromDate(days[0]), endISO = isoFromDate(days[6]);
     var weekSessions = sessionsInRange(startISO, endISO);
-    var weekMeals = mealsInRange(startISO, endISO);
+    var weekDiet = dietDaysInRange(startISO, endISO);
 
     var dayLabels = days.map(function (d) {
       return { label: fmtShortWeekday(d), isToday: isSameDate(d, new Date()) };
@@ -654,7 +678,8 @@
 
     var totalMinutes = weekSessions.reduce(function (a, s) { return a + (s.duration || 0); }, 0);
     var doneCount = weekSessions.filter(function (s) { return s.done; }).length;
-    var adherence = adherenceRate(weekMeals);
+    var weekKcalTotals = weekDiet.map(function (d) { return dietTotalsForDay(d).kcal; }).filter(function (k) { return k > 0; });
+    var avgKcal = weekKcalTotals.length ? Math.round(weekKcalTotals.reduce(function (a, k) { return a + k; }, 0) / weekKcalTotals.length) : null;
     var dist = typeDistribution(weekSessions);
 
     var html = '';
@@ -668,7 +693,7 @@
     html += '<div class="stat-row">' +
       '<div class="stat-tile"><div class="value accent">' + doneCount + '/' + state.profile.weeklyGoal + '</div><div class="label">séances<br/>vs objectif</div></div>' +
       '<div class="stat-tile"><div class="value">' + minutesToLabel(totalMinutes) + '</div><div class="label">temps total</div></div>' +
-      '<div class="stat-tile"><div class="value good">' + (adherence === null ? '–' : adherence + '%') + '</div><div class="label">diète<br/>respectée</div></div>' +
+      '<div class="stat-tile"><div class="value good">' + (avgKcal === null ? '–' : avgKcal) + '</div><div class="label">kcal moy.<br/>/ jour</div></div>' +
       '</div>';
 
     html += goalBannerHTML(doneCount, state.profile.weeklyGoal, ui.weekOffset === 0, startISO);
@@ -714,13 +739,12 @@
   function renderEvolution() {
     var range = periodRange();
     var sessions = sessionsInRange(range.start, range.end);
-    var meals = mealsInRange(range.start, range.end);
+    var dietDays = dietDaysInRange(range.start, range.end);
     var weights = state.weights.filter(function (w) { return w.date >= range.start && w.date <= range.end; });
     var dist = typeDistribution(sessions);
     var totalMinutes = sessions.reduce(function (a, s) { return a + (s.duration || 0); }, 0);
     var days = Math.max(1, Math.round((parseISO(range.end) - parseISO(range.start)) / 86400000) + 1);
     var avgPerWeek = (sessions.length / (days / 7)).toFixed(1);
-    var adherence = adherenceRate(meals);
 
     var html = '';
 
@@ -769,9 +793,22 @@
     }
     html += '</div>';
 
-    html += '<div class="card"><div class="card-title">Diète <span class="sub">taux de repas respectés</span></div>';
-    html += meterHTML(meals.filter(function (m) { return m.status === 'ok'; }).length, meals.length || 1, 'var(--status-good)');
-    if (!meals.length) html += '<div class="empty-state">Pas encore de repas enregistrés.</div>';
+    html += '<div class="card"><div class="card-title">Diète <span class="sub">kcal par jour · objectif ' + DIET_TARGETS.kcal + '</span></div>';
+    if (!dietDays.length) {
+      html += '<div class="empty-state">Pas encore de diète enregistrée sur cette période.</div>';
+    } else {
+      var kcalPoints = [];
+      var kcalCursor = parseISO(range.start);
+      while (isoFromDate(kcalCursor) <= range.end) {
+        kcalPoints.push({ label: fmtShortDate(kcalCursor), v: dietTotalsForDay(dietDayFor(isoFromDate(kcalCursor))).kcal });
+        kcalCursor = addDays(kcalCursor, 1);
+      }
+      html += '<figure class="chart-figure">' + lineChartSeries(kcalPoints, 'var(--series-3)', function (v) { return v + ' kcal'; }) + '</figure>';
+      var proteinVals = dietDays.map(function (d) { return dietTotalsForDay(d).p; }).filter(function (p) { return p > 0; });
+      var avgProtein = proteinVals.length ? Math.round(proteinVals.reduce(function (a, p) { return a + p; }, 0) / proteinVals.length) : 0;
+      html += '<div class="card-title" style="margin-top:16px;">Protéines <span class="sub">moyenne / objectif ' + DIET_TARGETS.protein + ' g</span></div>';
+      html += meterHTML(avgProtein, DIET_TARGETS.protein, 'var(--status-good)');
+    }
     html += '</div>';
 
     html += '<div class="card"><div class="card-title">Poids <span class="sub">évolution</span></div>';
@@ -790,6 +827,67 @@
     var e = document.getElementById('customEndInput');
     if (s) s.addEventListener('change', function () { ui.customStart = s.value; render(); });
     if (e) e.addEventListener('change', function () { ui.customEnd = e.value; render(); });
+  }
+
+  /* ==========================================================================
+     Vue Diète
+     ========================================================================== */
+
+  function renderDiet() {
+    var dateISO = ui.dietDate;
+    var d = dietDayFor(dateISO);
+    var totals = dietTotalsForDay(d);
+    var isRestaurant = !!(d && d.dinner === 'RESTAURANT');
+    var isToday = dateISO === todayISO();
+
+    var html = '';
+
+    html += '<div class="card"><div class="week-nav">' +
+      '<button class="icon-btn" data-action="diet-day-nav" data-dir="-1" aria-label="Jour précédent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>' +
+      '<div class="label">' + (isToday ? 'Aujourd’hui · ' : '') + esc(fmtHeaderDate(parseISO(dateISO))) + '</div>' +
+      '<button class="icon-btn" data-action="diet-day-nav" data-dir="1" aria-label="Jour suivant" ' + (isToday ? 'disabled style="opacity:.35"' : '') + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>' +
+      '</div></div>';
+
+    html += '<div class="stat-row">' +
+      '<div class="stat-tile"><div class="value accent">' + totals.kcal + '</div><div class="label">kcal<br/>objectif ' + DIET_TARGETS.kcal + '</div></div>' +
+      '<div class="stat-tile"><div class="value">' + totals.p + ' g</div><div class="label">protéines<br/>objectif ' + DIET_TARGETS.protein + 'g</div></div>' +
+      '<div class="stat-tile"><div class="value good">' + (totals.kcal ? Math.round(totals.kcal / DIET_TARGETS.kcal * 100) + '%' : '–') + '</div><div class="label">de l’objectif<br/>kcal</div></div>' +
+      '</div>';
+
+    DIET_SLOTS.forEach(function (slot) {
+      if (slot.field === 'dessert' && isRestaurant) return;
+      var currentValue = d ? d[slot.field] : null;
+      html += '<div class="card"><div class="card-title">' + esc(slot.label) + '</div><div class="diet-option-list">';
+      DIET_PLAN[slot.category].forEach(function (opt) {
+        var active = currentValue === opt.id;
+        html += '<div class="diet-option-row' + (active ? ' active' : '') + '" data-action="pick-diet" data-field="' + slot.field + '" data-value="' + opt.id + '">' +
+          '<div class="dor-name">' + esc(opt.name) + '</div>' +
+          '<div class="dor-kcal">' + opt.kcal + ' kcal</div>' +
+          '</div>';
+      });
+      if (slot.allowRestaurant) {
+        html += '<div class="diet-option-row' + (isRestaurant ? ' active' : '') + '" data-action="pick-diet" data-field="dinner" data-value="RESTAURANT">' +
+          '<div class="dor-name">🍽️ Restaurant <span class="dor-note">remplace dîner + dessert</span></div>' +
+          '<div class="dor-kcal">' + (isRestaurant && d.restaurantKcal ? d.restaurantKcal + ' kcal' : '?') + '</div>' +
+          '</div>';
+      }
+      html += '</div>';
+      if (slot.allowRestaurant && isRestaurant) {
+        html += '<div class="field" style="margin-top:14px;"><label>Estimation du repas restaurant (kcal)</label>' +
+          '<input type="number" id="restaurantKcalInput" placeholder="Ex: 900" value="' + (d.restaurantKcal || '') + '"/></div>';
+      }
+      html += '</div>';
+    });
+
+    document.getElementById('view').innerHTML = html;
+
+    var restInput = document.getElementById('restaurantKcalInput');
+    if (restInput) {
+      restInput.addEventListener('change', function () {
+        var val = parseInt(restInput.value, 10);
+        pickDietOption(ui.dietDate, 'restaurantKcal', isNaN(val) ? null : val).then(render);
+      });
+    }
   }
 
   function renderExerciseBlock(ex) {
@@ -1064,6 +1162,7 @@
     if (ui.tab === 'jour') renderDay();
     else if (ui.tab === 'semaine') renderWeek();
     else if (ui.tab === 'historique') renderHistorique();
+    else if (ui.tab === 'diete') renderDiet();
     else renderEvolution();
   }
 
@@ -1093,12 +1192,19 @@
       return;
     }
     if (action === 'duplicate-session') { duplicateSession(el.getAttribute('data-id')); return; }
-    if (action === 'meal-status') {
-      setMealStatus(el.getAttribute('data-date'), el.getAttribute('data-slot'), el.getAttribute('data-status'))
-        .then(render).catch(function (err) { toast(err.message); });
+    if (action === 'logout') { logout(); return; }
+    if (action === 'diet-day-nav') {
+      var dietDir = parseInt(el.getAttribute('data-dir'), 10);
+      ui.dietDate = isoFromDate(addDays(parseISO(ui.dietDate), dietDir));
+      render();
       return;
     }
-    if (action === 'logout') { logout(); return; }
+    if (action === 'pick-diet') {
+      var dField = el.getAttribute('data-field');
+      var dValue = el.getAttribute('data-value');
+      pickDietOption(ui.dietDate, dField, dValue).then(render).catch(function (err) { toast(err.message); });
+      return;
+    }
     if (action === 'week-nav') {
       var dir = parseInt(el.getAttribute('data-dir'), 10);
       ui.weekOffset = Math.min(0, ui.weekOffset + dir);

@@ -24,18 +24,33 @@ function mapWeight(row) {
   return { id: String(row.id), date: row.date, kg: parseFloat(row.kg) };
 }
 
+function mapDietDay(row) {
+  return {
+    id: String(row.id),
+    date: row.date,
+    breakfast: row.breakfast,
+    lunch: row.lunch,
+    snack: row.snack,
+    dinner: row.dinner,
+    dessert: row.dessert,
+    restaurantKcal: row.restaurant_kcal
+  };
+}
+
 router.get('/state', async function (req, res) {
   var uid = req.userId;
   var userRes = await pool.query('SELECT name, weekly_goal FROM users WHERE id = $1', [uid]);
   var sessionsRes = await pool.query('SELECT * FROM sessions WHERE user_id = $1 ORDER BY date DESC, id DESC', [uid]);
   var mealsRes = await pool.query('SELECT * FROM meals WHERE user_id = $1', [uid]);
   var weightsRes = await pool.query('SELECT * FROM weights WHERE user_id = $1 ORDER BY date ASC', [uid]);
+  var dietRes = await pool.query('SELECT * FROM diet_days WHERE user_id = $1', [uid]);
 
   res.json({
     profile: { name: userRes.rows[0].name, weeklyGoal: userRes.rows[0].weekly_goal },
     sessions: sessionsRes.rows.map(mapSession),
     meals: mealsRes.rows.map(mapMeal),
-    weights: weightsRes.rows.map(mapWeight)
+    weights: weightsRes.rows.map(mapWeight),
+    dietDays: dietRes.rows.map(mapDietDay)
   });
 });
 
@@ -107,6 +122,23 @@ router.put('/weights', async function (req, res) {
 router.delete('/weights/:id', async function (req, res) {
   await pool.query('DELETE FROM weights WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
   res.status(204).end();
+});
+
+// ---------- Diète ----------
+
+var DIET_FIELDS = { breakfast: 'breakfast', lunch: 'lunch', snack: 'snack', dinner: 'dinner', dessert: 'dessert', restaurantKcal: 'restaurant_kcal' };
+
+router.put('/diet', async function (req, res) {
+  var b = req.body || {};
+  var column = DIET_FIELDS[b.field];
+  if (!column) return res.status(400).json({ error: 'Champ de diète invalide.' });
+  var value = b.value === undefined ? null : b.value;
+  var result = await pool.query(
+    'INSERT INTO diet_days (user_id, date, ' + column + ') VALUES ($1,$2,$3) ' +
+    'ON CONFLICT (user_id, date) DO UPDATE SET ' + column + ' = $3 RETURNING *',
+    [req.userId, b.date, value]
+  );
+  res.json(mapDietDay(result.rows[0]));
 });
 
 module.exports = router;

@@ -441,32 +441,6 @@ main.view {
 }
 .btn-add-inline:active { background: #e2dbff; }
 
-/* ---------- Meal rows ---------- */
-.meal-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--border);
-}
-.meal-row:last-child { border-bottom: none; }
-.meal-row .m-name { flex: 1; font-size: 14px; font-weight: 600; }
-.meal-status-group { display: flex; gap: 6px; }
-.meal-status-btn {
-  width: 34px; height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-size: 15px;
-  font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-}
-.meal-status-btn[data-status="ok"].active { background: var(--status-good); border-color: var(--status-good); color: #fff; }
-.meal-status-btn[data-status="ecart"].active { background: var(--status-warning); border-color: var(--status-warning); color: #3a2a00; }
-.meal-status-btn[data-status="raté"].active { background: var(--status-critical); border-color: var(--status-critical); color: #fff; }
-
 /* ---------- Streak ---------- */
 .streak-banner {
   display: flex;
@@ -755,6 +729,39 @@ main.view {
   background: #fff;
 }
 .field textarea { resize: vertical; min-height: 60px; }
+
+/* ---------- Diète (plan alimentaire) ---------- */
+.diet-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diet-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 12px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  background: var(--surface-2);
+}
+.diet-option-row.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.dor-name { font-size: 14px; font-weight: 600; flex: 1; }
+.diet-option-row.active .dor-name { color: var(--accent-dark); }
+.dor-note { font-weight: 500; color: var(--text-muted); font-size: 11.5px; display: block; margin-top: 2px; }
+.dor-kcal {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.diet-option-row.active .dor-kcal { color: var(--accent-dark); }
 
 /* ---------- Exercices (formulaire d'ajout de séance) ---------- */
 .exercise-list {
