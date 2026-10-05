@@ -16,10 +16,6 @@ function mapSession(row) {
   };
 }
 
-function mapMeal(row) {
-  return { id: String(row.id), date: row.date, slot: row.slot, status: row.status };
-}
-
 function mapWeight(row) {
   return { id: String(row.id), date: row.date, kg: parseFloat(row.kg) };
 }
@@ -42,40 +38,88 @@ function mapDietDay(row) {
   };
 }
 
+function mapProfile(row) {
+  return { id: String(row.id), name: row.name, sex: row.sex, weeklyGoal: row.weekly_goal };
+}
+
+// Résout le profil actif pour ce compte : celui demandé (s'il appartient bien au
+// compte) sinon le plus ancien profil du compte. Chaque compte a toujours au moins
+// un profil (créé à l'inscription, ou lors de la migration pour les anciens comptes).
+async function resolveProfile(userId, requestedId) {
+  var all = await pool.query('SELECT * FROM profiles WHERE user_id = $1 ORDER BY id ASC', [userId]);
+  if (!all.rows.length) return null;
+  if (requestedId) {
+    var match = all.rows.filter(function (p) { return String(p.id) === String(requestedId); })[0];
+    if (match) return { profile: match, all: all.rows };
+  }
+  return { profile: all.rows[0], all: all.rows };
+}
+
+// ---------- Profils ----------
+
+router.get('/profiles', async function (req, res) {
+  var result = await pool.query('SELECT * FROM profiles WHERE user_id = $1 ORDER BY id ASC', [req.userId]);
+  res.json(result.rows.map(mapProfile));
+});
+
+router.post('/profiles', async function (req, res) {
+  var b = req.body || {};
+  var name = String(b.name || '').trim().slice(0, 60);
+  var sex = b.sex === 'f' ? 'f' : 'h';
+  var weeklyGoal = Math.max(1, Math.min(14, parseInt(b.weeklyGoal, 10) || 4));
+  if (!name) return res.status(400).json({ error: 'Indique un prénom.' });
+  var result = await pool.query(
+    'INSERT INTO profiles (user_id, name, sex, weekly_goal) VALUES ($1,$2,$3,$4) RETURNING *',
+    [req.userId, name, sex, weeklyGoal]
+  );
+  res.status(201).json(mapProfile(result.rows[0]));
+});
+
+router.put('/profiles/:id', async function (req, res) {
+  var b = req.body || {};
+  var name = String(b.name || '').trim().slice(0, 60);
+  var sex = b.sex === 'f' ? 'f' : 'h';
+  var weeklyGoal = Math.max(1, Math.min(14, parseInt(b.weeklyGoal, 10) || 4));
+  if (!name) return res.status(400).json({ error: 'Indique un prénom.' });
+  var result = await pool.query(
+    'UPDATE profiles SET name = $1, sex = $2, weekly_goal = $3 WHERE id = $4 AND user_id = $5 RETURNING *',
+    [name, sex, weeklyGoal, req.params.id, req.userId]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Profil introuvable.' });
+  res.json(mapProfile(result.rows[0]));
+});
+
+// ---------- État combiné ----------
+
 router.get('/state', async function (req, res) {
   var uid = req.userId;
-  var userRes = await pool.query('SELECT name, weekly_goal FROM users WHERE id = $1', [uid]);
-  var sessionsRes = await pool.query('SELECT * FROM sessions WHERE user_id = $1 ORDER BY date DESC, id DESC', [uid]);
-  var mealsRes = await pool.query('SELECT * FROM meals WHERE user_id = $1', [uid]);
-  var weightsRes = await pool.query('SELECT * FROM weights WHERE user_id = $1 ORDER BY date ASC', [uid]);
-  var dietRes = await pool.query('SELECT * FROM diet_days WHERE user_id = $1', [uid]);
+  var resolved = await resolveProfile(uid, req.query.profileId);
+  if (!resolved) return res.status(500).json({ error: 'Aucun profil pour ce compte.' });
+  var pid = resolved.profile.id;
+
+  var sessionsRes = await pool.query('SELECT * FROM sessions WHERE profile_id = $1 ORDER BY date DESC, id DESC', [pid]);
+  var weightsRes = await pool.query('SELECT * FROM weights WHERE profile_id = $1 ORDER BY date ASC', [pid]);
+  var dietRes = await pool.query('SELECT * FROM diet_days WHERE profile_id = $1', [pid]);
 
   res.json({
-    profile: { name: userRes.rows[0].name, weeklyGoal: userRes.rows[0].weekly_goal },
+    profiles: resolved.all.map(mapProfile),
+    profile: mapProfile(resolved.profile),
     sessions: sessionsRes.rows.map(mapSession),
-    meals: mealsRes.rows.map(mapMeal),
+    meals: [],
     weights: weightsRes.rows.map(mapWeight),
     dietDays: dietRes.rows.map(mapDietDay)
   });
-});
-
-router.put('/me', async function (req, res) {
-  var name = String((req.body && req.body.name) || '').trim().slice(0, 60);
-  var weeklyGoal = Math.max(1, Math.min(14, parseInt((req.body && req.body.weeklyGoal) || 4, 10) || 4));
-  var result = await pool.query(
-    'UPDATE users SET name = $1, weekly_goal = $2 WHERE id = $3 RETURNING name, weekly_goal',
-    [name, weeklyGoal, req.userId]
-  );
-  res.json({ name: result.rows[0].name, weeklyGoal: result.rows[0].weekly_goal });
 });
 
 // ---------- Séances ----------
 
 router.post('/sessions', async function (req, res) {
   var b = req.body || {};
+  var resolved = await resolveProfile(req.userId, b.profileId);
+  if (!resolved) return res.status(400).json({ error: 'Profil invalide.' });
   var result = await pool.query(
-    'INSERT INTO sessions (user_id, date, type_id, duration, intensity, note, exercises, done) VALUES ($1,$2,$3,$4,$5,$6,$7,true) RETURNING *',
-    [req.userId, b.date, b.typeId, b.duration || 0, b.intensity || 3, b.note || '', JSON.stringify(b.exercises || [])]
+    'INSERT INTO sessions (user_id, profile_id, date, type_id, duration, intensity, note, exercises, done) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true) RETURNING *',
+    [req.userId, resolved.profile.id, b.date, b.typeId, b.duration || 0, b.intensity || 3, b.note || '', JSON.stringify(b.exercises || [])]
   );
   res.status(201).json(mapSession(result.rows[0]));
 });
@@ -95,31 +139,16 @@ router.delete('/sessions/:id', async function (req, res) {
   res.status(204).end();
 });
 
-// ---------- Repas ----------
-
-router.put('/meals', async function (req, res) {
-  var b = req.body || {};
-  var result = await pool.query(
-    'INSERT INTO meals (user_id, date, slot, status) VALUES ($1,$2,$3,$4) ' +
-    'ON CONFLICT (user_id, date, slot) DO UPDATE SET status = excluded.status RETURNING *',
-    [req.userId, b.date, b.slot, b.status]
-  );
-  res.json(mapMeal(result.rows[0]));
-});
-
-router.delete('/meals/:id', async function (req, res) {
-  await pool.query('DELETE FROM meals WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
-  res.status(204).end();
-});
-
 // ---------- Poids ----------
 
 router.put('/weights', async function (req, res) {
   var b = req.body || {};
+  var resolved = await resolveProfile(req.userId, b.profileId);
+  if (!resolved) return res.status(400).json({ error: 'Profil invalide.' });
   var result = await pool.query(
-    'INSERT INTO weights (user_id, date, kg) VALUES ($1,$2,$3) ' +
-    'ON CONFLICT (user_id, date) DO UPDATE SET kg = excluded.kg RETURNING *',
-    [req.userId, b.date, b.kg]
+    'INSERT INTO weights (user_id, profile_id, date, kg) VALUES ($1,$2,$3,$4) ' +
+    'ON CONFLICT (profile_id, date) DO UPDATE SET kg = excluded.kg RETURNING *',
+    [req.userId, resolved.profile.id, b.date, b.kg]
   );
   res.json(mapWeight(result.rows[0]));
 });
@@ -143,10 +172,13 @@ router.put('/diet', async function (req, res) {
   var b = req.body || {};
   var column = DIET_FIELDS[b.field];
   if (!column) return res.status(400).json({ error: 'Champ de diète invalide.' });
+  var resolved = await resolveProfile(req.userId, b.profileId);
+  if (!resolved) return res.status(400).json({ error: 'Profil invalide.' });
+  var pid = resolved.profile.id;
   var value = b.value === undefined ? null : b.value;
   var isSlot = DIET_SLOT_FIELDS.indexOf(b.field) !== -1;
 
-  var existing = await pool.query('SELECT custom_meals FROM diet_days WHERE user_id = $1 AND date = $2', [req.userId, b.date]);
+  var existing = await pool.query('SELECT custom_meals FROM diet_days WHERE profile_id = $1 AND date = $2', [pid, b.date]);
   var customMeals = (existing.rows[0] && existing.rows[0].custom_meals) || {};
 
   if (isSlot) {
@@ -164,9 +196,9 @@ router.put('/diet', async function (req, res) {
   }
 
   var result = await pool.query(
-    'INSERT INTO diet_days (user_id, date, ' + column + ', custom_meals) VALUES ($1,$2,$3,$4) ' +
-    'ON CONFLICT (user_id, date) DO UPDATE SET ' + column + ' = $3, custom_meals = $4 RETURNING *',
-    [req.userId, b.date, value, JSON.stringify(customMeals)]
+    'INSERT INTO diet_days (user_id, profile_id, date, ' + column + ', custom_meals) VALUES ($1,$2,$3,$4,$5) ' +
+    'ON CONFLICT (profile_id, date) DO UPDATE SET ' + column + ' = $4, custom_meals = $5 RETURNING *',
+    [req.userId, pid, b.date, value, JSON.stringify(customMeals)]
   );
   res.json(mapDietDay(result.rows[0]));
 });

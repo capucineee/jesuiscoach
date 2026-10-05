@@ -5,13 +5,14 @@ const { hashPassword, verifyPassword, signToken } = require('../auth');
 const router = express.Router();
 
 function publicUser(row) {
-  return { name: row.name, weeklyGoal: row.weekly_goal, email: row.email };
+  return { email: row.email };
 }
 
 router.post('/register', async function (req, res) {
   var email = String((req.body && req.body.email) || '').trim().toLowerCase();
   var password = String((req.body && req.body.password) || '');
   var name = String((req.body && req.body.name) || '').trim();
+  var sex = (req.body && req.body.sex) === 'f' ? 'f' : 'h';
 
   if (!email || !email.includes('@')) return res.status(400).json({ error: 'Adresse email invalide.' });
   if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit faire au moins 6 caractères.' });
@@ -25,7 +26,11 @@ router.post('/register', async function (req, res) {
     [email, hash, name]
   );
   var user = result.rows[0];
-  res.status(201).json({ token: signToken(user.id), user: publicUser(user) });
+  var profileResult = await pool.query(
+    'INSERT INTO profiles (user_id, name, sex, weekly_goal) VALUES ($1, $2, $3, 4) RETURNING *',
+    [user.id, name || 'Moi', sex]
+  );
+  res.status(201).json({ token: signToken(user.id), user: publicUser(user), profileId: String(profileResult.rows[0].id) });
 });
 
 router.post('/login', async function (req, res) {

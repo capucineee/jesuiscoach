@@ -12,7 +12,9 @@
     { id: 'autre',   label: 'Autres',      icon: '⭐',  color: '#eda100' }
   ];
 
-  var DIET_PLAN = {
+  // Plan alimentaire de Killian (homme). Voir DIET_PLAN_WOMAN pour celui de Capucine —
+  // le plan actif dépend du sexe renseigné sur le profil (voir activeDietPlan()).
+  var DIET_PLAN_MAN = {
     breakfast: [
       { id: 'B1', name: 'Œufs, courgettes et tartine', kcal: 460, p: 29, g: 27, l: 25 },
       { id: 'B2', name: 'Bol de skyr', kcal: 450, p: 32, g: 34, l: 20 },
@@ -56,7 +58,55 @@
       { id: 'S2', name: 'Skyr et banane', kcal: 220, p: 24, g: 29, l: 1 }
     ]
   };
-  var DIET_TARGETS = { kcal: 2200, protein: 180 };
+  var DIET_TARGETS_MAN = { kcal: 2200, protein: 180 };
+
+  // Plan alimentaire de Capucine (femme), basé sur son plan plaisir à choix équivalents.
+  var DIET_PLAN_WOMAN = {
+    breakfast: [
+      { id: 'B1', name: 'Bol banane et Kinder Bueno', kcal: 495, p: 21, g: 67, l: 17 },
+      { id: 'B2', name: 'Bol skyr, avoine et banane', kcal: 490, p: 28, g: 68, l: 12 },
+      { id: 'B3', name: 'Œuf, tartine, skyr et banane', kcal: 485, p: 27, g: 61, l: 16 }
+    ],
+    mainMeal: [
+      { id: 'P1', name: 'Poulet et pâtes complètes', kcal: 620, p: 29, g: 83, l: 19 },
+      { id: 'P2', name: 'Dinde et riz', kcal: 600, p: 25, g: 87, l: 17 },
+      { id: 'P3', name: 'Steak haché 5 % et pommes de terre', kcal: 600, p: 27, g: 77, l: 19 },
+      { id: 'P4', name: 'Poisson blanc et riz', kcal: 615, p: 25, g: 91, l: 17 },
+      { id: 'P5', name: 'Saumon, pâtes et sauce au skyr', kcal: 545, p: 32, g: 80, l: 10 },
+      { id: 'P6', name: 'Tofu et lentilles', kcal: 595, p: 33, g: 77, l: 18 },
+      { id: 'P7', name: 'Bavette grillée et pommes de terre', kcal: 600, p: 26, g: 79, l: 20 }
+    ],
+    // Sources de protéines et féculents du repas, décomposées à partir des 7 lignes
+    // ci-dessus pour permettre de composer un déjeuner/dîner sur-mesure (ex: poulet +
+    // pommes de terre plutôt que poulet + pâtes). Valeurs estimées, approximatives.
+    protein: [
+      { id: 'POULET', name: 'Poulet', kcal: 80, p: 16, g: 0, l: 2 },
+      { id: 'DINDE', name: 'Dinde', kcal: 75, p: 17, g: 0, l: 1 },
+      { id: 'STEAK', name: 'Steak haché 5 %', kcal: 95, p: 15, g: 0, l: 4 },
+      { id: 'POISSON', name: 'Poisson blanc', kcal: 57, p: 13, g: 0, l: 1 },
+      { id: 'SAUMON', name: 'Saumon (+ sauce skyr)', kcal: 145, p: 15, g: 1, l: 8 },
+      { id: 'TOFU', name: 'Tofu ferme', kcal: 116, p: 12, g: 2, l: 7 },
+      { id: 'BAVETTE', name: 'Bavette', kcal: 90, p: 13, g: 0, l: 4 }
+    ],
+    carb: [
+      { id: 'PATES', name: 'Pâtes complètes (+ légumes)', kcal: 546, p: 16, g: 76, l: 18 },
+      { id: 'RIZ', name: 'Riz (+ légumes)', kcal: 546, p: 10, g: 87, l: 16 },
+      { id: 'PDT', name: 'Pommes de terre (+ légumes)', kcal: 490, p: 11, g: 75, l: 15 },
+      { id: 'LENTILLES', name: 'Lentilles et pâtes (+ légumes)', kcal: 483, p: 21, g: 70, l: 13 }
+    ],
+    snack: [
+      { id: 'C1', name: 'Skyr, banane et Kinder Bueno', kcal: 300, p: 15, g: 39, l: 11 },
+      { id: 'C2', name: 'Fromage blanc, banane et amandes', kcal: 295, p: 18, g: 38, l: 11 },
+      { id: 'C3', name: 'Tartine chocolat noir et pomme', kcal: 315, p: 15, g: 47, l: 8 }
+    ],
+    dessert: [
+      { id: 'S1', name: 'Skyr, fraises et Schoko-Bons', kcal: 160, p: 12, g: 18, l: 5 },
+      { id: 'S2', name: 'Skyr et chocolat noir', kcal: 150, p: 12, g: 11, l: 7 },
+      { id: 'S3', name: 'Fromage blanc et pomme', kcal: 150, p: 12, g: 27, l: 1 }
+    ]
+  };
+  var DIET_TARGETS_WOMAN = { kcal: 2150, protein: 100 };
+
   // Blocs simples (une seule option à choisir) : petit-déjeuner, goûter, dessert.
   // Le déjeuner et le dîner ont leur propre logique (protéine + féculent) gérée à part.
   var DIET_SLOTS = [
@@ -68,6 +118,9 @@
     { field: 'lunch', label: 'Déjeuner' },
     { field: 'dinner', label: 'Dîner', allowRestaurant: true }
   ];
+
+  function activeDietPlan() { return (state.profile && state.profile.sex === 'f') ? DIET_PLAN_WOMAN : DIET_PLAN_MAN; }
+  function activeDietTargets() { return (state.profile && state.profile.sex === 'f') ? DIET_TARGETS_WOMAN : DIET_TARGETS_MAN; }
 
   var QUOTES = [
     "Chaque séance compte, {name}. Un pas de plus vers l'objectif.",
@@ -192,7 +245,8 @@
 
   function defaultState() {
     return {
-      profile: { name: '', weeklyGoal: 4 },
+      profiles: [],
+      profile: { id: null, name: '', sex: 'h', weeklyGoal: 4 },
       sessions: [],
       meals: [],
       weights: [],
@@ -203,10 +257,11 @@
   var TOKEN_KEY = 'jsc.token';
   var EMAIL_KEY = 'jsc.email';
   var CACHE_KEY = 'jsc.cache';
+  var ACTIVE_PROFILE_KEY = 'jsc.activeProfile';
 
   var state = defaultState();
   var auth = { token: null, email: '' };
-  var ui = { tab: 'jour', weekOffset: 0, period: '7', customStart: '', customEnd: '', sheet: null, draft: {}, authTab: 'login', authBusy: false, dietDate: todayISO() };
+  var ui = { tab: 'jour', weekOffset: 0, period: '7', customStart: '', customEnd: '', sheet: null, draft: {}, authTab: 'login', authBusy: false, authSex: 'h', dietDate: todayISO(), activeProfileId: null };
 
   function loadCachedState() {
     try {
@@ -215,6 +270,7 @@
       var parsed = JSON.parse(raw);
       var d = defaultState();
       return {
+        profiles: parsed.profiles || [],
         profile: Object.assign({}, d.profile, parsed.profile || {}),
         sessions: parsed.sessions || [],
         meals: parsed.meals || [],
@@ -270,7 +326,7 @@
 
   function findDietOption(category, id) {
     if (!id) return null;
-    var list = DIET_PLAN[category] || [];
+    var list = activeDietPlan()[category] || [];
     for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
     return null;
   }
@@ -345,7 +401,7 @@
     var existing = dietDayFor(dateISO);
     var toggleable = field !== 'restaurantKcal';
     var newValue = (toggleable && existing && existing[field] === value) ? null : value;
-    return apiFetch('/api/diet', { method: 'PUT', body: JSON.stringify({ date: dateISO, field: field, value: newValue }) }).then(function (row) {
+    return apiFetch('/api/diet', { method: 'PUT', body: JSON.stringify({ date: dateISO, field: field, value: newValue, profileId: state.profile.id }) }).then(function (row) {
       applyDietRow(dateISO, row);
     });
   }
@@ -358,7 +414,7 @@
     var name = nameInput ? nameInput.value.trim() : '';
     return apiFetch('/api/diet', {
       method: 'PUT',
-      body: JSON.stringify({ date: ui.dietDate, field: field, value: 'CUSTOM', customMeal: { name: name, kcal: kcal } })
+      body: JSON.stringify({ date: ui.dietDate, field: field, value: 'CUSTOM', customMeal: { name: name, kcal: kcal }, profileId: state.profile.id })
     }).then(function (row) {
       applyDietRow(ui.dietDate, row);
     });
@@ -367,7 +423,7 @@
   function addSession(obj) {
     return apiFetch('/api/sessions', { method: 'POST', body: JSON.stringify({
       date: obj.date, typeId: obj.typeId, duration: obj.duration, intensity: obj.intensity,
-      note: obj.note || '', exercises: obj.exercises || []
+      note: obj.note || '', exercises: obj.exercises || [], profileId: state.profile.id
     }) }).then(function (row) {
       state.sessions.push(row);
       cacheStateLocally();
@@ -391,7 +447,7 @@
   }
 
   function addWeight(dateISO, kg) {
-    return apiFetch('/api/weights', { method: 'PUT', body: JSON.stringify({ date: dateISO, kg: kg }) }).then(function (row) {
+    return apiFetch('/api/weights', { method: 'PUT', body: JSON.stringify({ date: dateISO, kg: kg, profileId: state.profile.id }) }).then(function (row) {
       var existing = state.weights.filter(function (w) { return w.date === dateISO; })[0];
       if (existing) existing.kg = row.kg;
       else state.weights.push(row);
@@ -674,7 +730,7 @@
     html += '<div class="stat-row">' +
       '<div class="stat-tile"><div class="value accent">' + doneThisWeek + '/' + state.profile.weeklyGoal + '</div><div class="label">séances<br/>objectif semaine</div></div>' +
       '<div class="stat-tile"><div class="value">' + streak + ' 🔥</div><div class="label">jours de suite</div></div>' +
-      '<div class="stat-tile"><div class="value good">' + (todayKcal || '–') + '</div><div class="label">kcal du jour<br/>objectif ' + DIET_TARGETS.kcal + '</div></div>' +
+      '<div class="stat-tile"><div class="value good">' + (todayKcal || '–') + '</div><div class="label">kcal du jour<br/>objectif ' + activeDietTargets().kcal + '</div></div>' +
       '</div>';
 
     html += goalBannerHTML(doneThisWeek, state.profile.weeklyGoal, true, isoFromDate(weekMonday));
@@ -860,7 +916,7 @@
     }
     html += '</div>';
 
-    html += '<div class="card"><div class="card-title">Diète <span class="sub">kcal par jour · objectif ' + DIET_TARGETS.kcal + '</span></div>';
+    html += '<div class="card"><div class="card-title">Diète <span class="sub">kcal par jour · objectif ' + activeDietTargets().kcal + '</span></div>';
     if (!dietDays.length) {
       html += '<div class="empty-state">Pas encore de diète enregistrée sur cette période.</div>';
     } else {
@@ -873,8 +929,8 @@
       html += '<figure class="chart-figure">' + lineChartSeries(kcalPoints, 'var(--series-3)', function (v) { return v + ' kcal'; }) + '</figure>';
       var proteinVals = dietDays.map(function (d) { return dietTotalsForDay(d).p; }).filter(function (p) { return p > 0; });
       var avgProtein = proteinVals.length ? Math.round(proteinVals.reduce(function (a, p) { return a + p; }, 0) / proteinVals.length) : 0;
-      html += '<div class="card-title" style="margin-top:16px;">Protéines <span class="sub">moyenne / objectif ' + DIET_TARGETS.protein + ' g</span></div>';
-      html += meterHTML(avgProtein, DIET_TARGETS.protein, 'var(--status-good)');
+      html += '<div class="card-title" style="margin-top:16px;">Protéines <span class="sub">moyenne / objectif ' + activeDietTargets().protein + ' g</span></div>';
+      html += meterHTML(avgProtein, activeDietTargets().protein, 'var(--status-good)');
     }
     html += '</div>';
 
@@ -916,9 +972,9 @@
       '</div></div>';
 
     html += '<div class="stat-row">' +
-      '<div class="stat-tile"><div class="value accent">' + totals.kcal + '</div><div class="label">kcal<br/>objectif ' + DIET_TARGETS.kcal + '</div></div>' +
-      '<div class="stat-tile"><div class="value">' + totals.p + ' g</div><div class="label">protéines<br/>objectif ' + DIET_TARGETS.protein + 'g</div></div>' +
-      '<div class="stat-tile"><div class="value good">' + (totals.kcal ? Math.round(totals.kcal / DIET_TARGETS.kcal * 100) + '%' : '–') + '</div><div class="label">de l’objectif<br/>kcal</div></div>' +
+      '<div class="stat-tile"><div class="value accent">' + totals.kcal + '</div><div class="label">kcal<br/>objectif ' + activeDietTargets().kcal + '</div></div>' +
+      '<div class="stat-tile"><div class="value">' + totals.p + ' g</div><div class="label">protéines<br/>objectif ' + activeDietTargets().protein + 'g</div></div>' +
+      '<div class="stat-tile"><div class="value good">' + (totals.kcal ? Math.round(totals.kcal / activeDietTargets().kcal * 100) + '%' : '–') + '</div><div class="label">de l’objectif<br/>kcal</div></div>' +
       '</div>';
 
     function optionRowHTML(field, opt, activeValue) {
@@ -950,7 +1006,7 @@
       if (slot.field === 'dessert' && isRestaurant) return;
       var currentValue = d ? d[slot.field] : null;
       html += '<div class="card"><div class="card-title">' + esc(slot.label) + '</div><div class="diet-option-list">';
-      DIET_PLAN[slot.category].forEach(function (opt) { html += optionRowHTML(slot.field, opt, currentValue); });
+      activeDietPlan()[slot.category].forEach(function (opt) { html += optionRowHTML(slot.field, opt, currentValue); });
       html += customRowHTML(slot.field, currentValue, 'Repas personnalisé');
       html += '</div>';
       if (currentValue === 'CUSTOM') html += customInputsHTML(slot.field);
@@ -984,13 +1040,13 @@
         }
 
         html += '<div class="diet-subheading">Source de protéines</div><div class="diet-option-list">';
-        DIET_PLAN.protein.forEach(function (opt) { html += optionRowHTML(proteinField, opt, proteinVal); });
+        activeDietPlan().protein.forEach(function (opt) { html += optionRowHTML(proteinField, opt, proteinVal); });
         html += customRowHTML(proteinField, proteinVal, 'Protéine personnalisée');
         html += '</div>';
         if (proteinVal === 'CUSTOM') html += customInputsHTML(proteinField);
 
         html += '<div class="diet-subheading">Féculent / glucides</div><div class="diet-option-list">';
-        DIET_PLAN.carb.forEach(function (opt) { html += optionRowHTML(carbField, opt, carbVal); });
+        activeDietPlan().carb.forEach(function (opt) { html += optionRowHTML(carbField, opt, carbVal); });
         html += customRowHTML(carbField, carbVal, 'Féculent personnalisé');
         html += '</div>';
         if (carbVal === 'CUSTOM') html += customInputsHTML(carbField);
@@ -1059,7 +1115,8 @@
     ui.sheet = name;
     ui.draft = draftOverride || (name === 'session' ? { date: todayISO(), typeId: 'muscu', duration: 45, intensity: 3, note: '', exercises: [] }
       : name === 'weight' ? { date: todayISO(), kg: '' }
-      : name === 'settings' ? { name: state.profile.name, weeklyGoal: state.profile.weeklyGoal }
+      : name === 'settings' ? { name: state.profile.name, sex: state.profile.sex || 'h', weeklyGoal: state.profile.weeklyGoal }
+      : name === 'addProfile' ? { name: '', sex: 'h', weeklyGoal: 4 }
       : {});
     renderSheet();
     document.getElementById('sheetOverlay').classList.add('open');
@@ -1147,16 +1204,48 @@
       var d3 = ui.draft;
       var html3 = '<div class="sheet-handle"></div><h2>Réglages</h2>';
       html3 += '<div class="field"><label>Prénom</label><input type="text" id="profileName" value="' + esc(d3.name) + '" placeholder="Ex: Lucas"/></div>';
+      html3 += '<div class="field"><label>Sexe <span class="dor-note" style="display:inline;">(détermine le plan alimentaire)</span></label><div class="auth-tabs">' +
+        '<button type="button" class="auth-tab sex-btn' + (d3.sex === 'h' ? ' active' : '') + '" data-action="draft-sex" data-sex="h">Homme</button>' +
+        '<button type="button" class="auth-tab sex-btn' + (d3.sex === 'f' ? ' active' : '') + '" data-action="draft-sex" data-sex="f">Femme</button>' +
+        '</div></div>';
       html3 += '<div class="field"><label>Objectif de séances / semaine</label><div class="stepper">' +
         '<button data-action="draft-goal" data-delta="-1">−</button>' +
         '<span class="val">' + d3.weeklyGoal + '</span>' +
         '<button data-action="draft-goal" data-delta="1">+</button>' +
         '</div></div>';
       html3 += '<button class="btn-primary" data-action="save-settings">Enregistrer</button>';
+
+      if (state.profiles && state.profiles.length) {
+        html3 += '<div class="field" style="margin-top:22px;"><label>Profils du compte</label></div>';
+        state.profiles.forEach(function (p) {
+          var isActive = p.id === state.profile.id;
+          html3 += '<div class="settings-row"><div class="l">' + esc(p.name || 'Sans nom') + (isActive ? ' <span class="s">profil actif</span>' : '') + '</div>' +
+            (isActive ? '' : '<button class="btn-add-inline" data-action="pick-profile" data-id="' + p.id + '" style="width:auto;padding:8px 16px;">Changer</button>') +
+            '</div>';
+        });
+        html3 += '<button class="btn-add-inline" data-action="open-add-profile" style="margin-top:10px;">+ Ajouter un profil</button>';
+      }
+
       html3 += '<div class="settings-row" style="margin-top:14px;"><div class="l">Connecté avec<span class="s">' + esc(auth.email) + '</span></div>' +
         '<button class="btn-add-inline" data-action="logout" style="width:auto;padding:8px 16px;">Déconnexion</button></div>';
       c.innerHTML = html3;
       document.getElementById('profileName').addEventListener('input', function (e) { ui.draft.name = e.target.value; });
+    } else if (ui.sheet === 'addProfile') {
+      var d5 = ui.draft;
+      var html5 = '<div class="sheet-handle"></div><h2>Nouveau profil</h2>';
+      html5 += '<div class="field"><label>Prénom</label><input type="text" id="newProfileName" value="' + esc(d5.name) + '" placeholder="Ex: Killian"/></div>';
+      html5 += '<div class="field"><label>Sexe <span class="dor-note" style="display:inline;">(détermine le plan alimentaire)</span></label><div class="auth-tabs">' +
+        '<button type="button" class="auth-tab sex-btn' + (d5.sex === 'h' ? ' active' : '') + '" data-action="draft-sex" data-sex="h">Homme</button>' +
+        '<button type="button" class="auth-tab sex-btn' + (d5.sex === 'f' ? ' active' : '') + '" data-action="draft-sex" data-sex="f">Femme</button>' +
+        '</div></div>';
+      html5 += '<div class="field"><label>Objectif de séances / semaine</label><div class="stepper">' +
+        '<button data-action="draft-goal" data-delta="-1">−</button>' +
+        '<span class="val">' + d5.weeklyGoal + '</span>' +
+        '<button data-action="draft-goal" data-delta="1">+</button>' +
+        '</div></div>';
+      html5 += '<button class="btn-primary" data-action="save-new-profile">Créer le profil</button>';
+      c.innerHTML = html5;
+      document.getElementById('newProfileName').addEventListener('input', function (e) { ui.draft.name = e.target.value; });
     } else {
       var html4 = '<div class="sheet-handle"></div><h2>Ajouter</h2>';
       html4 += '<div class="quick-action" data-action="open-sheet" data-sheet="session"><div class="qi">🏋️</div><div><div class="qt">Séance de sport</div><div class="qs">Type, durée, intensité</div></div></div>';
@@ -1184,12 +1273,21 @@
 
   function showAuthScreen() {
     document.getElementById('authScreen').hidden = false;
+    document.getElementById('profileScreen').hidden = true;
     document.getElementById('appShell').hidden = true;
     renderAuthForm();
   }
 
+  function showProfileScreen() {
+    document.getElementById('authScreen').hidden = true;
+    document.getElementById('profileScreen').hidden = false;
+    document.getElementById('appShell').hidden = true;
+    renderProfileScreen();
+  }
+
   function showApp() {
     document.getElementById('authScreen').hidden = true;
+    document.getElementById('profileScreen').hidden = true;
     document.getElementById('appShell').hidden = false;
   }
 
@@ -1199,6 +1297,10 @@
       b.classList.toggle('active', b.getAttribute('data-auth-tab') === ui.authTab);
     });
     document.getElementById('authNameField').hidden = !isRegister;
+    document.getElementById('authSexField').hidden = !isRegister;
+    document.querySelectorAll('#authSexField .sex-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-sex') === ui.authSex);
+    });
     document.getElementById('authPassword').setAttribute('autocomplete', isRegister ? 'new-password' : 'current-password');
     document.getElementById('authSubmit').textContent = isRegister ? 'Créer mon compte' : 'Se connecter';
     document.getElementById('authError').hidden = true;
@@ -1210,21 +1312,59 @@
     el.hidden = false;
   }
 
+  function renderProfileScreen() {
+    var list = document.getElementById('profileList');
+    var html = state.profiles.map(function (p) {
+      var initial = (p.name || '?').trim().charAt(0).toUpperCase() || '?';
+      return '<button type="button" class="profile-item" data-action="pick-profile" data-id="' + p.id + '">' +
+        '<span class="profile-avatar">' + esc(initial) + '</span>' +
+        '<span class="profile-item-name">' + esc(p.name || 'Sans nom') + '</span>' +
+        '</button>';
+    }).join('');
+    list.innerHTML = html;
+  }
+
+  function selectProfile(pid) {
+    closeSheet();
+    ui.activeProfileId = pid;
+    try { localStorage.setItem(ACTIVE_PROFILE_KEY, pid); } catch (e) {}
+    return apiFetch('/api/state?profileId=' + encodeURIComponent(pid)).then(function (data) {
+      state = data;
+      cacheStateLocally();
+      ui.tab = 'jour';
+      showApp();
+      render();
+      maybeShowWhatsNew();
+    }).catch(function (err) { toast(err.message || 'Impossible de charger ce profil.'); });
+  }
+
   function bootAfterAuth() {
     var cached = loadCachedState();
     if (cached) state = cached;
-    showApp();
-    render();
-    apiFetch('/api/state').then(function (data) {
+    var storedProfileId = null;
+    try { storedProfileId = localStorage.getItem(ACTIVE_PROFILE_KEY); } catch (e) {}
+    ui.activeProfileId = storedProfileId;
+
+    if (cached && storedProfileId) { showApp(); render(); }
+
+    var qs = storedProfileId ? ('?profileId=' + encodeURIComponent(storedProfileId)) : '';
+    apiFetch('/api/state' + qs).then(function (data) {
       state = data;
       cacheStateLocally();
-      render();
+      ui.activeProfileId = data.profile.id;
+      try { localStorage.setItem(ACTIVE_PROFILE_KEY, data.profile.id); } catch (e) {}
+      if (!storedProfileId && data.profiles.length > 1) {
+        showProfileScreen();
+      } else {
+        showApp();
+        render();
+        maybeShowWhatsNew();
+      }
     }).catch(function (err) {
       if (err.status === 401) { logout(); toast('Session expirée, reconnecte-toi — tes données sont toujours là.'); return; }
-      if (!cached) toast('Impossible de charger tes données (hors-ligne ?)');
-      else toast('Hors-ligne — dernières données enregistrées');
+      if (cached && storedProfileId) { toast('Hors-ligne — dernières données enregistrées'); }
+      else toast('Impossible de charger tes données (hors-ligne ?)');
     });
-    maybeShowWhatsNew();
   }
 
   var NOTICE_VERSION = 'historique-2026-09';
@@ -1249,7 +1389,9 @@
     try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
     try { localStorage.removeItem(EMAIL_KEY); } catch (e) {}
     try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+    try { localStorage.removeItem(ACTIVE_PROFILE_KEY); } catch (e) {}
     state = defaultState();
+    ui.activeProfileId = null;
     showAuthScreen();
   }
 
@@ -1270,7 +1412,7 @@
     var password = document.getElementById('authPassword').value;
     var name = document.getElementById('authName').value.trim();
     var path = isRegister ? '/api/auth/register' : '/api/auth/login';
-    var body = isRegister ? { email: email, password: password, name: name } : { email: email, password: password };
+    var body = isRegister ? { email: email, password: password, name: name, sex: ui.authSex } : { email: email, password: password };
 
     ui.authBusy = true;
     var btn = document.getElementById('authSubmit');
@@ -1279,6 +1421,9 @@
       auth.token = data.token;
       auth.email = data.user.email;
       try { localStorage.setItem(TOKEN_KEY, data.token); localStorage.setItem(EMAIL_KEY, data.user.email); } catch (err) {}
+      if (data.profileId) {
+        try { localStorage.setItem(ACTIVE_PROFILE_KEY, data.profileId); } catch (err) {}
+      }
       bootAfterAuth();
     }).catch(function (err) {
       setAuthError(err.message || 'Une erreur est survenue.');
@@ -1291,6 +1436,8 @@
   document.addEventListener('click', function (e) {
     var el = e.target.closest('[data-action="auth-tab"]');
     if (el) { ui.authTab = el.getAttribute('data-auth-tab'); renderAuthForm(); }
+    var sexEl = e.target.closest('[data-action="auth-sex"]');
+    if (sexEl) { ui.authSex = sexEl.getAttribute('data-sex'); renderAuthForm(); }
   });
 
   /* ==========================================================================
@@ -1369,6 +1516,18 @@
       renderSheet();
       return;
     }
+    if (action === 'draft-sex') { ui.draft.sex = el.getAttribute('data-sex'); renderSheet(); return; }
+    if (action === 'open-add-profile') { openSheet('addProfile'); return; }
+    if (action === 'pick-profile') { selectProfile(el.getAttribute('data-id')); return; }
+    if (action === 'save-new-profile') {
+      var pname = (ui.draft.name || '').trim();
+      if (!pname) { toast('Indique un prénom'); return; }
+      apiFetch('/api/profiles', { method: 'POST', body: JSON.stringify({ name: pname, sex: ui.draft.sex, weeklyGoal: ui.draft.weeklyGoal }) }).then(function (profile) {
+        toast('Profil créé 👋');
+        return selectProfile(profile.id);
+      }).catch(function (err) { toast(err.message); });
+      return;
+    }
     if (action === 'add-exercise') {
       var nameInput = document.getElementById('newExerciseName');
       var name = (nameInput.value || '').trim();
@@ -1430,8 +1589,12 @@
     if (action === 'save-settings') {
       var newName = (ui.draft.name || '').trim();
       var newGoal = ui.draft.weeklyGoal || 4;
-      apiFetch('/api/me', { method: 'PUT', body: JSON.stringify({ name: newName, weeklyGoal: newGoal }) }).then(function (profile) {
+      var newSex = ui.draft.sex || 'h';
+      apiFetch('/api/profiles/' + state.profile.id, { method: 'PUT', body: JSON.stringify({ name: newName, sex: newSex, weeklyGoal: newGoal }) }).then(function (profile) {
         state.profile = profile;
+        var idx = -1;
+        state.profiles.forEach(function (p, i) { if (p.id === profile.id) idx = i; });
+        if (idx !== -1) state.profiles[idx] = profile; else state.profiles.push(profile);
         cacheStateLocally();
         closeSheet();
         render();
