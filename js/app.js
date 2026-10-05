@@ -707,6 +707,15 @@
      Vue Jour
      ========================================================================== */
 
+  function profileSwitcherHTML() {
+    if (!state.profiles || state.profiles.length < 2) return '';
+    var pills = state.profiles.map(function (p) {
+      var active = p.id === state.profile.id;
+      return '<button type="button" class="profile-pill' + (active ? ' active' : '') + '" data-action="pick-profile" data-id="' + p.id + '">' + esc(p.name || '?') + '</button>';
+    }).join('');
+    return '<div class="profile-switcher">' + pills + '</div>';
+  }
+
   function renderDay() {
     var iso = todayISO();
     var todays = sessionsOn(iso);
@@ -718,6 +727,8 @@
     var quote = quoteForDate(iso, state.profile.name);
 
     var html = '';
+
+    html += profileSwitcherHTML();
 
     html += '<div class="motivation-card">' +
       '<div class="quote-mark">“</div>' +

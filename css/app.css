@@ -294,6 +294,30 @@ main.view {
   font-size: 12px;
 }
 
+/* ---------- Sélecteur de profil rapide (onglet Aujourd'hui) ---------- */
+.profile-switcher {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+}
+.profile-pill {
+  flex: none;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.profile-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ---------- Motivation card ---------- */
 .motivation-card {
   background: var(--accent);
