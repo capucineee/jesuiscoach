@@ -351,7 +351,7 @@
     }
     function addCustom(field) {
       var cm = d.customMeals && d.customMeals[field];
-      if (cm) total.kcal += cm.kcal || 0;
+      if (cm) { total.kcal += cm.kcal || 0; total.p += cm.p || 0; }
     }
     function addSlot(field, category) {
       if (d[field] === 'CUSTOM') addCustom(field);
@@ -409,12 +409,15 @@
   function saveCustomMeal(field) {
     var nameInput = document.getElementById('customName-' + field);
     var kcalInput = document.getElementById('customKcal-' + field);
+    var proteinInput = document.getElementById('customProtein-' + field);
     var kcal = kcalInput ? parseInt(kcalInput.value, 10) : NaN;
     if (isNaN(kcal) || kcal <= 0) return null;
     var name = nameInput ? nameInput.value.trim() : '';
+    var protein = proteinInput ? parseInt(proteinInput.value, 10) : NaN;
+    if (isNaN(protein) || protein < 0) protein = 0;
     return apiFetch('/api/diet', {
       method: 'PUT',
-      body: JSON.stringify({ date: ui.dietDate, field: field, value: 'CUSTOM', customMeal: { name: name, kcal: kcal }, profileId: state.profile.id })
+      body: JSON.stringify({ date: ui.dietDate, field: field, value: 'CUSTOM', customMeal: { name: name, kcal: kcal, p: protein }, profileId: state.profile.id })
     }).then(function (row) {
       applyDietRow(ui.dietDate, row);
     });
@@ -999,9 +1002,10 @@
     function customRowHTML(field, activeValue, label) {
       var customData = (d && d.customMeals && d.customMeals[field]) || null;
       var active = activeValue === 'CUSTOM';
+      var sub = customData && customData.kcal ? (customData.kcal + ' kcal' + (customData.p ? ' · ' + customData.p + ' g prot' : '')) : '?';
       return '<div class="diet-option-row' + (active ? ' active' : '') + '" data-action="pick-diet" data-field="' + field + '" data-value="CUSTOM">' +
         '<div class="dor-name">✏️ ' + esc(label) + '</div>' +
-        '<div class="dor-kcal">' + (customData && customData.kcal ? customData.kcal + ' kcal' : '?') + '</div>' +
+        '<div class="dor-kcal">' + sub + '</div>' +
         '</div>';
     }
 
@@ -1010,7 +1014,9 @@
       return '<div class="field" style="margin-top:14px;"><label>Nom (optionnel)</label>' +
         '<input type="text" id="customName-' + field + '" placeholder="Ex: Sandwich jambon" value="' + esc((customData && customData.name) || '') + '"/></div>' +
         '<div class="field"><label>Calories (kcal)</label>' +
-        '<input type="number" id="customKcal-' + field + '" placeholder="Ex: 450" value="' + ((customData && customData.kcal) || '') + '"/></div>';
+        '<input type="number" id="customKcal-' + field + '" placeholder="Ex: 450" value="' + ((customData && customData.kcal) || '') + '"/></div>' +
+        '<div class="field"><label>Protéines (g, optionnel)</label>' +
+        '<input type="number" id="customProtein-' + field + '" placeholder="Ex: 25" value="' + ((customData && customData.p) || '') + '"/></div>';
     }
 
     DIET_SLOTS.forEach(function (slot) {
@@ -1087,6 +1093,7 @@
     customCapableFields.forEach(function (field) {
       var nameInput = document.getElementById('customName-' + field);
       var kcalInput = document.getElementById('customKcal-' + field);
+      var proteinInput = document.getElementById('customProtein-' + field);
       if (!kcalInput) return;
       var handler = function () {
         var p = saveCustomMeal(field);
@@ -1094,6 +1101,7 @@
       };
       nameInput.addEventListener('change', handler);
       kcalInput.addEventListener('change', handler);
+      proteinInput.addEventListener('change', handler);
     });
   }
 

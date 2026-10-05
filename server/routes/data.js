@@ -187,7 +187,8 @@ router.put('/diet', async function (req, res) {
       customMeals = Object.assign({}, customMeals);
       customMeals[b.field] = {
         name: String(cm.name || '').trim().slice(0, 80),
-        kcal: Math.max(0, parseInt(cm.kcal, 10) || 0)
+        kcal: Math.max(0, parseInt(cm.kcal, 10) || 0),
+        p: Math.max(0, parseInt(cm.p, 10) || 0)
       };
     } else if (customMeals[b.field]) {
       customMeals = Object.assign({}, customMeals);
