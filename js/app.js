@@ -105,7 +105,7 @@
       { id: 'S3', name: 'Fromage blanc et pomme', kcal: 150, p: 12, g: 27, l: 1 }
     ]
   };
-  var DIET_TARGETS_WOMAN = { kcal: 2150, protein: 100 };
+  var DIET_TARGETS_WOMAN = { kcal: 1800, protein: 100 };
 
   // Blocs simples (une seule option à choisir) : petit-déjeuner, goûter, dessert.
   // Le déjeuner et le dîner ont leur propre logique (protéine + féculent) gérée à part.
