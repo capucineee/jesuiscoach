@@ -12,6 +12,11 @@
     { id: 'autre',   label: 'Autres',      icon: '⭐',  color: '#eda100' }
   ];
 
+  var CHECKLIST_CATEGORIES = [
+    { id: 'supplement', label: 'Compléments', icon: '💊' },
+    { id: 'medication', label: 'Médicaments', icon: '🩺' }
+  ];
+
   // Plan alimentaire de Killian (homme). Voir DIET_PLAN_WOMAN pour celui de Capucine —
   // le plan actif dépend du sexe renseigné sur le profil (voir activeDietPlan()).
   var DIET_PLAN_MAN = {
@@ -250,7 +255,9 @@
       sessions: [],
       meals: [],
       weights: [],
-      dietDays: []
+      dietDays: [],
+      checklistItems: [],
+      checklistLogs: []
     };
   }
 
@@ -275,7 +282,9 @@
         sessions: parsed.sessions || [],
         meals: parsed.meals || [],
         weights: parsed.weights || [],
-        dietDays: parsed.dietDays || []
+        dietDays: parsed.dietDays || [],
+        checklistItems: parsed.checklistItems || [],
+        checklistLogs: parsed.checklistLogs || []
       };
     } catch (e) { return null; }
   }
@@ -462,6 +471,42 @@
   function deleteWeight(id) {
     return apiFetch('/api/weights/' + id, { method: 'DELETE' }).then(function () {
       state.weights = state.weights.filter(function (w) { return w.id !== id; });
+      cacheStateLocally();
+    });
+  }
+
+  /* ==========================================================================
+     Compléments & médicaments
+     ========================================================================== */
+
+  function checklistItemsByCategory(category) {
+    return state.checklistItems.filter(function (it) { return it.category === category; });
+  }
+
+  function isChecklistDone(itemId, dateISO) {
+    return state.checklistLogs.some(function (l) { return l.itemId === itemId && l.date === dateISO; });
+  }
+
+  function addChecklistItem(category, title) {
+    return apiFetch('/api/checklist-items', { method: 'POST', body: JSON.stringify({ category: category, title: title, profileId: state.profile.id }) }).then(function (item) {
+      state.checklistItems.push(item);
+      cacheStateLocally();
+    });
+  }
+
+  function deleteChecklistItem(id) {
+    return apiFetch('/api/checklist-items/' + id, { method: 'DELETE' }).then(function () {
+      state.checklistItems = state.checklistItems.filter(function (it) { return it.id !== id; });
+      state.checklistLogs = state.checklistLogs.filter(function (l) { return l.itemId !== id; });
+      cacheStateLocally();
+    });
+  }
+
+  function toggleChecklistItem(itemId, dateISO) {
+    var done = !isChecklistDone(itemId, dateISO);
+    return apiFetch('/api/checklist-logs', { method: 'PUT', body: JSON.stringify({ itemId: itemId, date: dateISO, done: done }) }).then(function () {
+      if (done) state.checklistLogs.push({ itemId: itemId, date: dateISO });
+      else state.checklistLogs = state.checklistLogs.filter(function (l) { return !(l.itemId === itemId && l.date === dateISO); });
       cacheStateLocally();
     });
   }
@@ -759,9 +804,32 @@
     html += '<button class="btn-add-inline" data-action="open-sheet" data-sheet="session" style="margin-top:4px;">+ Ajouter une séance</button>';
     html += '</div>';
 
+    html += checklistCardHTML(iso);
+
     html += '<button class="btn-add-inline" data-action="switch-tab" data-tab="diete">🍽️ Remplir ma diète du jour</button>';
 
     document.getElementById('view').innerHTML = html;
+  }
+
+  function checklistCardHTML(dateISO) {
+    if (!state.checklistItems.length) return '';
+    var html = '<div class="card"><div class="card-title">À prendre aujourd’hui</div>';
+    CHECKLIST_CATEGORIES.forEach(function (cat) {
+      var items = checklistItemsByCategory(cat.id);
+      if (!items.length) return;
+      html += '<div class="diet-subheading">' + cat.icon + ' ' + esc(cat.label) + '</div>';
+      html += '<div class="checklist-list">';
+      items.forEach(function (it) {
+        var done = isChecklistDone(it.id, dateISO);
+        html += '<div class="checklist-row">' +
+          '<button class="btn-check' + (done ? ' done' : '') + '" data-action="toggle-checklist" data-id="' + it.id + '" aria-label="Valider">✓</button>' +
+          '<span class="checklist-title' + (done ? ' done' : '') + '">' + esc(it.title) + '</span>' +
+          '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    return html;
   }
 
   /* ==========================================================================
@@ -1234,6 +1302,23 @@
         '</div></div>';
       html3 += '<button class="btn-primary" data-action="save-settings">Enregistrer</button>';
 
+      CHECKLIST_CATEGORIES.forEach(function (cat) {
+        html3 += '<div class="field" style="margin-top:22px;"><label>' + cat.icon + ' ' + esc(cat.label) + '</label></div>';
+        var items = checklistItemsByCategory(cat.id);
+        if (items.length) {
+          items.forEach(function (it) {
+            html3 += '<div class="settings-row"><div class="l">' + esc(it.title) + '</div>' +
+              '<button class="btn-del-mini" data-action="delete-checklist-item" data-id="' + it.id + '" aria-label="Supprimer">✕</button></div>';
+          });
+        } else {
+          html3 += '<div class="dor-note" style="margin-bottom:8px;">Aucun ' + (cat.id === 'supplement' ? 'complément' : 'médicament') + ' pour l’instant.</div>';
+        }
+        html3 += '<div class="exercise-add-row" style="margin-top:8px;">' +
+          '<input type="text" id="newChecklistItem-' + cat.id + '" placeholder="Ex: ' + (cat.id === 'supplement' ? 'Vitamine D' : 'Doliprane') + '"/>' +
+          '<button class="btn-add-exercise" data-action="add-checklist-item" data-category="' + cat.id + '" aria-label="Ajouter">+</button>' +
+          '</div>';
+      });
+
       if (state.profiles && state.profiles.length) {
         html3 += '<div class="field" style="margin-top:22px;"><label>Profils du compte</label></div>';
         state.profiles.forEach(function (p) {
@@ -1499,6 +1584,26 @@
     }
     if (action === 'duplicate-session') { duplicateSession(el.getAttribute('data-id')); return; }
     if (action === 'logout') { logout(); return; }
+    if (action === 'toggle-checklist') {
+      toggleChecklistItem(el.getAttribute('data-id'), todayISO()).then(render).catch(function (err) { toast(err.message); });
+      return;
+    }
+    if (action === 'delete-checklist-item') {
+      deleteChecklistItem(el.getAttribute('data-id')).then(function () { renderSheet(); render(); }).catch(function (err) { toast(err.message); });
+      return;
+    }
+    if (action === 'add-checklist-item') {
+      var clCategory = el.getAttribute('data-category');
+      var clInput = document.getElementById('newChecklistItem-' + clCategory);
+      var clTitle = (clInput.value || '').trim();
+      if (!clTitle) { toast('Indique un titre'); return; }
+      addChecklistItem(clCategory, clTitle).then(function () {
+        clInput.value = '';
+        renderSheet();
+        render();
+      }).catch(function (err) { toast(err.message); });
+      return;
+    }
     if (action === 'diet-day-nav') {
       var dietDir = parseInt(el.getAttribute('data-dir'), 10);
       ui.dietDate = isoFromDate(addDays(parseISO(ui.dietDate), dietDir));

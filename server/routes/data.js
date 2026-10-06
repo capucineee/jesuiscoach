@@ -42,6 +42,14 @@ function mapProfile(row) {
   return { id: String(row.id), name: row.name, sex: row.sex, weeklyGoal: row.weekly_goal };
 }
 
+function mapChecklistItem(row) {
+  return { id: String(row.id), category: row.category, title: row.title };
+}
+
+function mapChecklistLog(row) {
+  return { itemId: String(row.item_id), date: row.date };
+}
+
 // Résout le profil actif pour ce compte : celui demandé (s'il appartient bien au
 // compte) sinon le plus ancien profil du compte. Chaque compte a toujours au moins
 // un profil (créé à l'inscription, ou lors de la migration pour les anciens comptes).
@@ -100,6 +108,11 @@ router.get('/state', async function (req, res) {
   var sessionsRes = await pool.query('SELECT * FROM sessions WHERE profile_id = $1 ORDER BY date DESC, id DESC', [pid]);
   var weightsRes = await pool.query('SELECT * FROM weights WHERE profile_id = $1 ORDER BY date ASC', [pid]);
   var dietRes = await pool.query('SELECT * FROM diet_days WHERE profile_id = $1', [pid]);
+  var checklistItemsRes = await pool.query('SELECT * FROM checklist_items WHERE profile_id = $1 ORDER BY id ASC', [pid]);
+  var checklistLogsRes = await pool.query(
+    'SELECT cl.* FROM checklist_logs cl JOIN checklist_items ci ON ci.id = cl.item_id WHERE ci.profile_id = $1',
+    [pid]
+  );
 
   res.json({
     profiles: resolved.all.map(mapProfile),
@@ -107,7 +120,9 @@ router.get('/state', async function (req, res) {
     sessions: sessionsRes.rows.map(mapSession),
     meals: [],
     weights: weightsRes.rows.map(mapWeight),
-    dietDays: dietRes.rows.map(mapDietDay)
+    dietDays: dietRes.rows.map(mapDietDay),
+    checklistItems: checklistItemsRes.rows.map(mapChecklistItem),
+    checklistLogs: checklistLogsRes.rows.map(mapChecklistLog)
   });
 });
 
@@ -202,6 +217,52 @@ router.put('/diet', async function (req, res) {
     [req.userId, pid, b.date, value, JSON.stringify(customMeals)]
   );
   res.json(mapDietDay(result.rows[0]));
+});
+
+// ---------- Compléments & médicaments ----------
+
+var CHECKLIST_CATEGORIES = ['supplement', 'medication'];
+
+router.post('/checklist-items', async function (req, res) {
+  var b = req.body || {};
+  var resolved = await resolveProfile(req.userId, b.profileId);
+  if (!resolved) return res.status(400).json({ error: 'Profil invalide.' });
+  var category = CHECKLIST_CATEGORIES.indexOf(b.category) !== -1 ? b.category : null;
+  var title = String(b.title || '').trim().slice(0, 60);
+  if (!category) return res.status(400).json({ error: 'Catégorie invalide.' });
+  if (!title) return res.status(400).json({ error: 'Indique un titre.' });
+  var result = await pool.query(
+    'INSERT INTO checklist_items (profile_id, category, title) VALUES ($1,$2,$3) RETURNING *',
+    [resolved.profile.id, category, title]
+  );
+  res.status(201).json(mapChecklistItem(result.rows[0]));
+});
+
+router.delete('/checklist-items/:id', async function (req, res) {
+  await pool.query(
+    'DELETE FROM checklist_items ci USING profiles p WHERE ci.id = $1 AND ci.profile_id = p.id AND p.user_id = $2',
+    [req.params.id, req.userId]
+  );
+  res.status(204).end();
+});
+
+router.put('/checklist-logs', async function (req, res) {
+  var b = req.body || {};
+  var owned = await pool.query(
+    'SELECT ci.id FROM checklist_items ci JOIN profiles p ON p.id = ci.profile_id WHERE ci.id = $1 AND p.user_id = $2',
+    [b.itemId, req.userId]
+  );
+  if (!owned.rows.length) return res.status(400).json({ error: 'Élément invalide.' });
+
+  if (b.done) {
+    await pool.query(
+      'INSERT INTO checklist_logs (item_id, date) VALUES ($1,$2) ON CONFLICT (item_id, date) DO NOTHING',
+      [b.itemId, b.date]
+    );
+  } else {
+    await pool.query('DELETE FROM checklist_logs WHERE item_id = $1 AND date = $2', [b.itemId, b.date]);
+  }
+  res.json({ itemId: String(b.itemId), date: b.date, done: !!b.done });
 });
 
 module.exports = router;

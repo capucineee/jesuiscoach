@@ -101,6 +101,23 @@ async function initSchema() {
       dinner_carb TEXT
     );
     CREATE INDEX IF NOT EXISTS diet_days_user_date_idx ON diet_days(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS checklist_items (
+      id SERIAL PRIMARY KEY,
+      profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS checklist_items_profile_idx ON checklist_items(profile_id);
+
+    CREATE TABLE IF NOT EXISTS checklist_logs (
+      id SERIAL PRIMARY KEY,
+      item_id INTEGER NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+      date DATE NOT NULL,
+      UNIQUE(item_id, date)
+    );
+    CREATE INDEX IF NOT EXISTS checklist_logs_item_date_idx ON checklist_logs(item_id, date);
   `);
 
   // Migrations : colonnes ajoutées après la création initiale des tables sur certains environnements.

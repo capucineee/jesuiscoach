@@ -845,6 +845,21 @@ main.view {
 }
 .diet-subheading:first-of-type { margin-top: 12px; }
 
+/* ---------- Compléments & médicaments ---------- */
+.checklist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.checklist-title { font-size: 14px; font-weight: 600; }
+.checklist-title.done { color: var(--text-muted); text-decoration: line-through; }
+
 /* ---------- Exercices (formulaire d'ajout de séance) ---------- */
 .exercise-list {
   display: flex;
