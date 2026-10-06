@@ -1239,7 +1239,8 @@
       htmlNew += '<div class="whats-new-item"><span class="wn-icon">👥</span><div><b>Profils multiples</b><span>Un même compte peut gérer plusieurs profils (toi, ton copain...). Change de profil d’un tap en haut de l’onglet Aujourd’hui, ou dans Réglages.</span></div></div>';
       htmlNew += '<div class="whats-new-item"><span class="wn-icon">🥗</span><div><b>Plan alimentaire selon le profil</b><span>Le plan nutritionnel et l’objectif de calories s’adaptent automatiquement selon le sexe renseigné pour chaque profil (dans Réglages).</span></div></div>';
       htmlNew += '<div class="whats-new-item"><span class="wn-icon">🍗</span><div><b>Déjeuner et dîner en 2 choix</b><span>Choisis séparément ta source de protéines et ton féculent (ex: poulet + pommes de terre), au lieu d’un plat complet imposé.</span></div></div>';
-      htmlNew += '<div class="whats-new-item"><span class="wn-icon">✏️</span><div><b>Repas personnalisé</b><span>Aucune option ne convient ? Ajoute un repas avec son nom et ses calories, pour n’importe quel créneau de la Diète.</span></div></div>';
+      htmlNew += '<div class="whats-new-item"><span class="wn-icon">✏️</span><div><b>Repas personnalisé</b><span>Aucune option ne convient ? Ajoute un repas avec son nom, ses calories et ses protéines (g), pour n’importe quel créneau de la Diète.</span></div></div>';
+      htmlNew += '<div class="whats-new-item"><span class="wn-icon">💊</span><div><b>Compléments & médicaments</b><span>Configure-les dans Réglages (par profil) : ils apparaissent comme des cases à cocher dans l’onglet Aujourd’hui.</span></div></div>';
       htmlNew += '</div>';
       htmlNew += '<button class="btn-primary" data-action="close-whatsnew">Compris !</button>';
       c.innerHTML = htmlNew;
@@ -1471,7 +1472,7 @@
     });
   }
 
-  var NOTICE_VERSION = 'profils-2026-10';
+  var NOTICE_VERSION = 'complements-2026-10';
   var NOTICE_KEY = 'jsc.notice.seen';
 
   function maybeShowWhatsNew() {
